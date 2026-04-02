@@ -1,9 +1,29 @@
-import { Stack } from 'expo-router';
+import { useEffect } from 'react'
+import { Slot, useRouter, useSegments } from 'expo-router'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function RootLayout() {
-  return (
-    <Stack>
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-    </Stack>
-  );
+  const { session, role, loading } = useAuth()
+  const router = useRouter()
+  const segments = useSegments()
+
+  useEffect(() => {
+    if (loading) return
+
+    const inAuthGroup = segments[0] === '(auth)'
+
+    if (!session && !inAuthGroup) {
+      router.replace('/(auth)/login')
+    } else if (session && role === 'coach' && segments[0] !== '(coach)') {
+      router.replace('/(coach)')
+    } else if (session && role === 'client' && segments[0] !== '(client)') {
+      router.replace('/(client)')
+    } else if (session && role === 'admin' && segments[0] !== '(admin)') {
+      router.replace('/(admin)')
+    }
+  }, [session, role, loading, segments])
+
+  if (loading) return null
+
+  return <Slot />
 }
