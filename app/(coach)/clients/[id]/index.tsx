@@ -54,6 +54,20 @@ export default function ClientDetailScreen() {
             </Text>
           </View>
         </View>
+        {onboarding && (
+          <TouchableOpacity
+            style={styles.generateBtn}
+            onPress={() => router.push({
+              pathname: '/(coach)/programs/generate',
+              params: {
+                clientId: client.id,
+                onboardingJson: JSON.stringify(onboarding),
+              },
+            })}
+          >
+            <Text style={styles.generateBtnText}>✨ Générer un programme</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.tabs}>
@@ -106,4 +120,6 @@ const styles = StyleSheet.create({
   content: { flex: 1 },
   tabContent: { padding: 40, alignItems: 'center' },
   tabContentText: { color: '#64748b', textAlign: 'center' },
+  generateBtn: { backgroundColor: '#3080ff', borderRadius: 12, padding: 12, alignItems: 'center', marginTop: 16 },
+  generateBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
 })
