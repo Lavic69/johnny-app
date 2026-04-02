@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "Johnny App",
+    "slug": "johnny-app",
+    "version": "1.0.0",
+    "scheme": "johnnyapp",
+    "platforms": ["ios", "android"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.johnny.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Scanner les codes-barres des produits alimentaires"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#e11d48"
+      },
+      "package": "com.johnny.app",
+      "permissions": ["CAMERA"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-barcode-scanner",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#e11d48"
+        }
+      ]
+    ]
+  }
+}
