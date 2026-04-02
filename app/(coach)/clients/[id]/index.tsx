@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '@/lib/supabase'
+import { useClientPrograms } from '@/hooks/usePrograms'
 import type { Client, Profile } from '@/types'
 
 type Tab = 'training' | 'nutrition' | 'checkins'
@@ -85,7 +86,7 @@ export default function ClientDetailScreen() {
       </View>
 
       <ScrollView style={styles.content}>
-        {activeTab === 'training' && <PlaceholderTab label="Programmes — Phase 3" />}
+        {activeTab === 'training' && <TrainingTab clientId={id} />}
         {activeTab === 'nutrition' && <PlaceholderTab label="Nutrition — Phase 5" />}
         {activeTab === 'checkins' && <PlaceholderTab label="Check-ins — Phase 6" />}
       </ScrollView>
@@ -100,6 +101,53 @@ function PlaceholderTab({ label }: { label: string }) {
     </View>
   )
 }
+
+function TrainingTab({ clientId }: { clientId: string }) {
+  const { programs, loading } = useClientPrograms(clientId)
+
+  if (loading) return <ActivityIndicator color="#e11d48" style={{ marginTop: 40 }} />
+
+  if (programs.length === 0) {
+    return (
+      <View style={styles.tabContent}>
+        <Text style={styles.tabContentText}>Aucun programme pour ce client.</Text>
+      </View>
+    )
+  }
+
+  return (
+    <View style={{ padding: 16 }}>
+      {programs.map((program) => (
+        <View key={program.id} style={programStyles.card}>
+          <View style={programStyles.cardHeader}>
+            <Text style={programStyles.date}>
+              {new Date(program.created_at).toLocaleDateString('fr-FR')}
+            </Text>
+            <View style={[programStyles.badge, program.status === 'approved' ? programStyles.approved : programStyles.draft]}>
+              <Text style={programStyles.badgeText}>
+                {program.status === 'approved' ? '✓ Approuvé' : 'Brouillon'}
+              </Text>
+            </View>
+          </View>
+          <Text style={programStyles.days}>
+            {Array.isArray(program.exercises) ? `${program.exercises.length} jours d'entraînement` : ''}
+          </Text>
+        </View>
+      ))}
+    </View>
+  )
+}
+
+const programStyles = StyleSheet.create({
+  card: { backgroundColor: '#334155', borderRadius: 16, padding: 16, marginBottom: 12 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  date: { color: '#94a3b8', fontSize: 13 },
+  badge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  approved: { backgroundColor: '#00bb7f22' },
+  draft: { backgroundColor: '#3080ff22' },
+  badgeText: { color: '#f8fafc', fontSize: 12, fontWeight: '600' },
+  days: { color: '#f8fafc', fontSize: 14 },
+})
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1e293b' },
