@@ -15,7 +15,6 @@ export default function RedeemScreen() {
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
   // Data fetched after code validation
@@ -58,7 +57,6 @@ export default function RedeemScreen() {
 
   async function handleCreateAccount() {
     if (password.length < 8) { Alert.alert('Erreur', 'Le mot de passe doit faire au moins 8 caractères'); return }
-    if (password !== confirmPassword) { Alert.alert('Erreur', 'Les mots de passe ne correspondent pas'); return }
     if (!tokenData) return
 
     setLoading(true)
@@ -126,20 +124,6 @@ export default function RedeemScreen() {
           secureTextEntry
           textContentType="newPassword"
           autoComplete="new-password"
-          autoCorrect={false}
-          autoCapitalize="none"
-        />
-
-        <Text style={styles.label}>Confirmer le mot de passe</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Répète ton mot de passe"
-          placeholderTextColor="#64748b"
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          secureTextEntry
-          textContentType="oneTimeCode"
-          autoComplete="off"
           autoCorrect={false}
           autoCapitalize="none"
         />
