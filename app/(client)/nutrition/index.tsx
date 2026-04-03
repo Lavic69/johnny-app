@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { useRouter } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
@@ -33,6 +33,34 @@ export default function NutritionScreen() {
   }, [clientId, today])
 
   useEffect(() => { fetchLogs() }, [fetchLogs])
+
+  async function handleDelete(logId: string, foodIndex: number) {
+    const log = logs.find((l) => l.id === logId)
+    if (!log) return
+
+    Alert.alert('Supprimer ?', 'Retirer cet aliment du journal ?', [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Supprimer',
+        style: 'destructive',
+        onPress: async () => {
+          const updatedFoods = log.foods.filter((_, i) => i !== foodIndex)
+
+          if (updatedFoods.length === 0) {
+            await supabase.from('food_logs').delete().eq('id', logId)
+          } else {
+            await supabase.from('food_logs').update({ foods: updatedFoods }).eq('id', logId)
+          }
+
+          setLogs((prev) =>
+            prev
+              .map((l) => l.id === logId ? { ...l, foods: updatedFoods } : l)
+              .filter((l) => l.foods.length > 0)
+          )
+        },
+      },
+    ])
+  }
 
   const allFoods = logs.flatMap((l) => l.foods)
   const totals = allFoods.reduce(
@@ -84,7 +112,13 @@ export default function NutritionScreen() {
             {mealFoods.length === 0 ? (
               <Text style={styles.emptyMeal}>Rien encore</Text>
             ) : (
-              mealFoods.map((food, i) => <FoodRow key={i} food={food} />)
+              mealFoods.map((food, i) => (
+                <FoodRow
+                  key={i}
+                  food={food}
+                  onDelete={mealLog ? () => handleDelete(mealLog.id, i) : undefined}
+                />
+              ))
             )}
           </View>
         )
@@ -103,7 +137,7 @@ function MacroStat({ label, value, unit, color }: { label: string; value: number
   )
 }
 
-function FoodRow({ food }: { food: FoodItem }) {
+function FoodRow({ food, onDelete }: { food: FoodItem; onDelete?: () => void }) {
   const ratio = food.quantity_g / 100
   return (
     <View style={foodStyles.row}>
@@ -112,6 +146,11 @@ function FoodRow({ food }: { food: FoodItem }) {
         <Text style={foodStyles.quantity}>{food.quantity_g}g</Text>
       </View>
       <Text style={foodStyles.calories}>{Math.round(food.calories * ratio)} kcal</Text>
+      {onDelete && (
+        <TouchableOpacity style={foodStyles.deleteBtn} onPress={onDelete} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text style={foodStyles.deleteText}>✕</Text>
+        </TouchableOpacity>
+      )}
     </View>
   )
 }
@@ -139,9 +178,11 @@ const macroStyles = StyleSheet.create({
 })
 
 const foodStyles = StyleSheet.create({
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#334155', borderRadius: 10, padding: 12, marginBottom: 6 },
+  row: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#334155', borderRadius: 10, padding: 12, marginBottom: 6, gap: 8 },
   info: { flex: 1 },
   name: { color: '#f8fafc', fontSize: 14, fontWeight: '500' },
   quantity: { color: '#64748b', fontSize: 12, marginTop: 2 },
   calories: { color: '#94a3b8', fontSize: 13 },
+  deleteBtn: { padding: 4 },
+  deleteText: { color: '#475569', fontSize: 16, fontWeight: 'bold' },
 })

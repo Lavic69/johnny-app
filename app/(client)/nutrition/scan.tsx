@@ -1,5 +1,8 @@
 import { useState, useRef } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native'
+import {
+  View, Text, TouchableOpacity, StyleSheet, Alert,
+  ActivityIndicator, TextInput, KeyboardAvoidingView, Platform
+} from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { searchByBarcode } from '@/lib/openfoodfacts'
@@ -16,6 +19,9 @@ export default function ScanScreen() {
   const [permission, requestPermission] = useCameraPermissions()
   const [scanned, setScanned] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [foundFood, setFoundFood] = useState<FoodItem | null>(null)
+  const [quantity, setQuantity] = useState('100')
+  const [saving, setSaving] = useState(false)
   const processingRef = useRef(false)
 
   if (!permission) return <View style={styles.container} />
@@ -39,14 +45,32 @@ export default function ScanScreen() {
 
     const food = await searchByBarcode(data)
 
+    setLoading(false)
+
     if (!food) {
       Alert.alert("Produit introuvable", "Ce code-barres n'est pas dans la base de données.", [
-        { text: 'Réessayer', onPress: () => { setScanned(false); processingRef.current = false } },
+        {
+          text: 'Réessayer',
+          onPress: () => {
+            setScanned(false)
+            processingRef.current = false
+          },
+        },
         { text: 'Retour', onPress: () => router.back() },
       ])
-      setLoading(false)
       return
     }
+
+    setFoundFood(food)
+    setQuantity('100')
+  }
+
+  async function handleAdd() {
+    if (!foundFood) return
+    setSaving(true)
+
+    const qty = parseFloat(quantity) || 100
+    const foodWithQty: FoodItem = { ...foundFood, quantity_g: qty }
 
     const { data: existing } = await supabase
       .from('food_logs')
@@ -57,19 +81,94 @@ export default function ScanScreen() {
       .maybeSingle()
 
     if (existing) {
-      await supabase.from('food_logs').update({ foods: [...(existing.foods as FoodItem[]), food] }).eq('id', existing.id)
+      await supabase
+        .from('food_logs')
+        .update({ foods: [...(existing.foods as FoodItem[]), foodWithQty] })
+        .eq('id', existing.id)
     } else {
-      await supabase.from('food_logs').insert({ client_id: clientId, logged_date: date, meal_type: mealType, foods: [food] })
+      await supabase.from('food_logs').insert({
+        client_id: clientId,
+        logged_date: date,
+        meal_type: mealType,
+        foods: [foodWithQty],
+      })
     }
 
-    setLoading(false)
+    setSaving(false)
     processingRef.current = false
-    Alert.alert('Ajouté !', `${food.name} ajouté au journal (100g).`, [
-      { text: 'Scanner encore', onPress: () => setScanned(false) },
+
+    Alert.alert('Ajouté !', `${foundFood.name} (${qty}g) ajouté au journal.`, [
+      {
+        text: 'Scanner encore',
+        onPress: () => {
+          setFoundFood(null)
+          setScanned(false)
+        },
+      },
       { text: 'Retour', onPress: () => router.back() },
     ])
   }
 
+  // Étape 2 — confirmation quantité
+  if (foundFood) {
+    const ratio = (parseFloat(quantity) || 100) / 100
+    return (
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.confirmContainer}>
+          <Text style={styles.confirmTitle}>Produit trouvé ✓</Text>
+          <View style={styles.foodCard}>
+            <Text style={styles.foodName}>{foundFood.name}</Text>
+            <Text style={styles.foodMacros}>
+              Pour 100g : {foundFood.calories} kcal · P {foundFood.protein_g}g · G {foundFood.carbs_g}g · L {foundFood.fat_g}g
+            </Text>
+          </View>
+
+          <Text style={styles.qtyLabel}>Quantité consommée (g)</Text>
+          <TextInput
+            style={styles.qtyInput}
+            value={quantity}
+            onChangeText={setQuantity}
+            keyboardType="decimal-pad"
+            selectTextOnFocus
+          />
+
+          {parseFloat(quantity) > 0 && (
+            <View style={styles.calcRow}>
+              <Text style={styles.calcText}>
+                → {Math.round(foundFood.calories * ratio)} kcal ·{' '}
+                P {Math.round(foundFood.protein_g * ratio * 10) / 10}g ·{' '}
+                G {Math.round(foundFood.carbs_g * ratio * 10) / 10}g ·{' '}
+                L {Math.round(foundFood.fat_g * ratio * 10) / 10}g
+              </Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[styles.addBtn, saving && styles.btnDisabled]}
+            onPress={handleAdd}
+            disabled={saving}
+          >
+            {saving
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.addBtnText}>Ajouter au journal</Text>
+            }
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.retryBtn}
+            onPress={() => { setFoundFood(null); setScanned(false); processingRef.current = false }}
+          >
+            <Text style={styles.retryBtnText}>← Scanner un autre produit</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    )
+  }
+
+  // Étape 1 — caméra
   return (
     <View style={styles.container}>
       <CameraView
@@ -108,4 +207,19 @@ const styles = StyleSheet.create({
   loadingText: { color: '#fff', marginTop: 12 },
   closeBtn: { position: 'absolute', top: 60, right: 20, backgroundColor: '#0008', borderRadius: 20, padding: 10 },
   closeBtnText: { color: '#fff', fontWeight: '600' },
+
+  confirmContainer: { flex: 1, backgroundColor: '#1e293b', padding: 24, paddingTop: 64 },
+  confirmTitle: { color: '#00bb7f', fontSize: 18, fontWeight: 'bold', marginBottom: 20 },
+  foodCard: { backgroundColor: '#334155', borderRadius: 16, padding: 16, marginBottom: 24 },
+  foodName: { color: '#f8fafc', fontWeight: 'bold', fontSize: 16, marginBottom: 6 },
+  foodMacros: { color: '#94a3b8', fontSize: 13 },
+  qtyLabel: { color: '#94a3b8', fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  qtyInput: { backgroundColor: '#334155', color: '#f8fafc', borderRadius: 12, padding: 16, fontSize: 28, fontWeight: 'bold', textAlign: 'center', marginBottom: 12 },
+  calcRow: { backgroundColor: '#0f172a', borderRadius: 10, padding: 12, marginBottom: 24 },
+  calcText: { color: '#64748b', fontSize: 13, textAlign: 'center' },
+  addBtn: { backgroundColor: '#00bb7f', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 12 },
+  btnDisabled: { opacity: 0.5 },
+  addBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  retryBtn: { padding: 12, alignItems: 'center' },
+  retryBtnText: { color: '#64748b', fontSize: 14 },
 })
