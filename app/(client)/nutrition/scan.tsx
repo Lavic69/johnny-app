@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { CameraView, useCameraPermissions } from 'expo-camera'
@@ -16,6 +16,7 @@ export default function ScanScreen() {
   const [permission, requestPermission] = useCameraPermissions()
   const [scanned, setScanned] = useState(false)
   const [loading, setLoading] = useState(false)
+  const processingRef = useRef(false)
 
   if (!permission) return <View style={styles.container} />
 
@@ -31,7 +32,8 @@ export default function ScanScreen() {
   }
 
   async function handleBarcode({ data }: { data: string }) {
-    if (scanned || loading) return
+    if (processingRef.current) return
+    processingRef.current = true
     setScanned(true)
     setLoading(true)
 
@@ -39,7 +41,7 @@ export default function ScanScreen() {
 
     if (!food) {
       Alert.alert("Produit introuvable", "Ce code-barres n'est pas dans la base de données.", [
-        { text: 'Réessayer', onPress: () => setScanned(false) },
+        { text: 'Réessayer', onPress: () => { setScanned(false); processingRef.current = false } },
         { text: 'Retour', onPress: () => router.back() },
       ])
       setLoading(false)
@@ -61,6 +63,7 @@ export default function ScanScreen() {
     }
 
     setLoading(false)
+    processingRef.current = false
     Alert.alert('Ajouté !', `${food.name} ajouté au journal (100g).`, [
       { text: 'Scanner encore', onPress: () => setScanned(false) },
       { text: 'Retour', onPress: () => router.back() },
