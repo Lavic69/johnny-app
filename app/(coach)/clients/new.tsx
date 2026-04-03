@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Alert, ScrollView, Share, Clipboard
 } from 'react-native'
 import { useRouter } from 'expo-router'
+import { useFocusEffect } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useCoach } from '@/hooks/useCoach'
@@ -26,6 +27,15 @@ export default function NewClientScreen() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [createdCode, setCreatedCode] = useState<string | null>(null)
+
+  useFocusEffect(
+    useCallback(() => {
+      setFullName('')
+      setEmail('')
+      setLoading(false)
+      setCreatedCode(null)
+    }, [])
+  )
 
   async function handleCreate() {
     if (!fullName.trim()) { Alert.alert('Erreur', 'Le nom est requis'); return }
