@@ -17,9 +17,8 @@ async function safeFetch(url: string): Promise<unknown | null> {
   try {
     const res = await fetch(url)
     if (!res.ok) return null
-    const contentType = res.headers.get('content-type') ?? ''
-    if (!contentType.includes('json')) return null
-    return await res.json()
+    const text = await res.text()
+    return JSON.parse(text)
   } catch {
     return null
   }
