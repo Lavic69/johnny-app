@@ -18,18 +18,19 @@ export default function SessionLogScreen() {
   const router = useRouter()
 
   const day: ProgramDay = JSON.parse(dayJson ?? '{}')
+  const items = day.items ?? []
 
   const [logs, setLogs] = useState<Record<string, { weight: string; reps: string; rpe: string }>>(
-    () => Object.fromEntries(day.items.map((e) => [e.name, { weight: '', reps: '', rpe: '' }]))
+    () => Object.fromEntries(items.map((e) => [e.name, { weight: '', reps: '', rpe: '' }]))
   )
   const [saving, setSaving] = useState(false)
 
   function updateLog(exercise: string, field: 'weight' | 'reps' | 'rpe', value: string) {
-    setLogs((prev) => ({ ...prev, [exercise]: { ...prev[exercise], [field]: value } }))
+    setLogs((prev) => ({ ...prev, [exercise]: { ...(prev[exercise] ?? {}), [field]: value } }))
   }
 
   async function handleSave() {
-    const sets: SetLog[] = day.items
+    const sets: SetLog[] = items
       .filter((e) => logs[e.name]?.weight || logs[e.name]?.reps)
       .map((e) => ({
         exercise: e.name,
@@ -106,7 +107,7 @@ export default function SessionLogScreen() {
       <Text style={styles.title}>{day.day}</Text>
       <Text style={styles.subtitle}>Logger ta séance</Text>
 
-      {day.items.map((exercise) => (
+      {items.map((exercise) => (
         <View key={exercise.name} style={styles.exerciseCard}>
           <Text style={styles.exerciseName}>{exercise.name}</Text>
           <Text style={styles.exercisePlan}>
