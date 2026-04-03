@@ -45,6 +45,8 @@ export default function CoachLayout() {
           ),
         }}
       />
+      {/* Caché de la tab bar — accessible via navigation depuis la fiche client */}
+      <Tabs.Screen name="programs" options={{ href: null }} />
     </Tabs>
   )
 }
