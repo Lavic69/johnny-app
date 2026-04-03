@@ -124,6 +124,10 @@ export default function RedeemScreen() {
           value={password}
           onChangeText={setPassword}
           secureTextEntry
+          textContentType="newPassword"
+          autoComplete="new-password"
+          autoCorrect={false}
+          autoCapitalize="none"
         />
 
         <Text style={styles.label}>Confirmer le mot de passe</Text>
@@ -134,6 +138,10 @@ export default function RedeemScreen() {
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           secureTextEntry
+          textContentType="oneTimeCode"
+          autoComplete="off"
+          autoCorrect={false}
+          autoCapitalize="none"
         />
 
         <TouchableOpacity
