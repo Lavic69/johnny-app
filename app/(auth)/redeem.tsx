@@ -67,8 +67,27 @@ export default function RedeemScreen() {
       password,
     })
 
-    if (signUpError || !authData.user) {
-      Alert.alert('Erreur', signUpError?.message ?? 'Impossible de créer le compte')
+    if (signUpError) {
+      const msg = signUpError.message.includes('rate limit') || signUpError.message.includes('email')
+        ? "Trop de tentatives ou email bloqué. Si le problème persiste, demande à ton coach de contacter l'administrateur."
+        : signUpError.message
+      Alert.alert('Erreur création compte', msg)
+      setLoading(false)
+      return
+    }
+
+    if (!authData.user) {
+      Alert.alert('Erreur', 'Compte non créé. Vérifie ta boîte mail pour confirmer ton email, ou désactive la confirmation email dans Supabase.')
+      setLoading(false)
+      return
+    }
+
+    // Si session null = confirmation email requise → pas supporté en V1
+    if (!authData.session) {
+      Alert.alert(
+        'Confirmation email requise',
+        'Le projet Supabase requiert une confirmation email. Désactive cette option dans Authentication → Email → "Confirm email".'
+      )
       setLoading(false)
       return
     }
