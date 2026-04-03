@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
+import Constants from 'expo-constants'
 import { Platform } from 'react-native'
 import { supabase } from './supabase'
 
@@ -12,6 +13,8 @@ Notifications.setNotificationHandler({
 })
 
 export async function registerPushToken(userId: string): Promise<void> {
+  // Push tokens ne fonctionnent pas dans Expo Go — skip silencieusement
+  if (Constants.appOwnership === 'expo') return
   if (!Device.isDevice) return
 
   const { status: existing } = await Notifications.getPermissionsAsync()
