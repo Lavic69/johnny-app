@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { useClientPrograms } from '@/hooks/usePrograms'
+import { useCheckins } from '@/hooks/useCheckins'
 import type { Client, Profile } from '@/types'
 
 type Tab = 'training' | 'nutrition' | 'checkins'
@@ -88,7 +89,7 @@ export default function ClientDetailScreen() {
       <ScrollView style={styles.content}>
         {activeTab === 'training' && <TrainingTab clientId={id} />}
         {activeTab === 'nutrition' && <PlaceholderTab label="Nutrition — Phase 5" />}
-        {activeTab === 'checkins' && <PlaceholderTab label="Check-ins — Phase 6" />}
+        {activeTab === 'checkins' && <CheckinsTab clientId={id} />}
       </ScrollView>
     </View>
   )
@@ -137,6 +138,56 @@ function TrainingTab({ clientId }: { clientId: string }) {
     </View>
   )
 }
+
+function CheckinsTab({ clientId }: { clientId: string }) {
+  const { checkins, loading } = useCheckins(clientId)
+
+  if (loading) return <ActivityIndicator color="#e11d48" style={{ marginTop: 40 }} />
+
+  if (checkins.length === 0) {
+    return (
+      <View style={styles.tabContent}>
+        <Text style={styles.tabContentText}>Aucun check-in pour ce client.</Text>
+      </View>
+    )
+  }
+
+  return (
+    <View style={{ padding: 16 }}>
+      {checkins.map((c) => (
+        <View key={c.id} style={checkinStyles.card}>
+          <Text style={checkinStyles.week}>
+            Semaine du {new Date(c.week_start).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}
+          </Text>
+          <View style={checkinStyles.scores}>
+            <ScoreBadge label="Énergie" value={c.energy} />
+            <ScoreBadge label="Récup" value={c.recovery} />
+            <ScoreBadge label="Moral" value={c.mood} />
+          </View>
+        </View>
+      ))}
+    </View>
+  )
+}
+
+function ScoreBadge({ label, value }: { label: string; value: number }) {
+  const color = value >= 4 ? '#00bb7f' : value >= 3 ? '#ff8b1a' : '#e11d48'
+  return (
+    <View style={checkinStyles.badge}>
+      <Text style={[checkinStyles.badgeValue, { color }]}>{value}/5</Text>
+      <Text style={checkinStyles.badgeLabel}>{label}</Text>
+    </View>
+  )
+}
+
+const checkinStyles = StyleSheet.create({
+  card: { backgroundColor: '#334155', borderRadius: 16, padding: 16, marginBottom: 10 },
+  week: { color: '#94a3b8', fontSize: 13, marginBottom: 10, textTransform: 'capitalize' },
+  scores: { flexDirection: 'row', gap: 8 },
+  badge: { flex: 1, backgroundColor: '#1e293b', borderRadius: 10, padding: 10, alignItems: 'center' },
+  badgeValue: { fontSize: 18, fontWeight: 'bold' },
+  badgeLabel: { color: '#64748b', fontSize: 11, marginTop: 2 },
+})
 
 const programStyles = StyleSheet.create({
   card: { backgroundColor: '#334155', borderRadius: 16, padding: 16, marginBottom: 12 },
