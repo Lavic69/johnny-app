@@ -1,5 +1,6 @@
+import { useCallback } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '@/hooks/useAuth'
 import { useClientId } from '@/hooks/useClientId'
@@ -9,8 +10,11 @@ import type { ProgramDay } from '@/lib/openai'
 export default function ClientHome() {
   const router = useRouter()
   const { profile } = useAuth()
-  const { clientId, onboarding, loading: clientLoading } = useClientId(profile?.id ?? null)
+  const { clientId, onboarding, loading: clientLoading, refetch } = useClientId(profile?.id ?? null)
   const { program, loading: programLoading } = useActiveProgram(clientId)
+
+  // Refetch à chaque fois que l'écran revient au premier plan (ex: retour de l'onboarding)
+  useFocusEffect(useCallback(() => { refetch() }, [refetch]))
 
   if (clientLoading || programLoading) {
     return <View style={styles.center}><ActivityIndicator color="#e11d48" size="large" /></View>
