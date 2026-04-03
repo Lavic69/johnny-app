@@ -31,6 +31,7 @@ export default function CoachLayout() {
         name="clients"
         options={{
           title: 'Clients',
+          unmountOnBlur: true,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people" size={size} color={color} />
           ),
