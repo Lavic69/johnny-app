@@ -60,11 +60,11 @@ function ClientCard({ client, onPress }: { client: ClientWithProfile; onPress: (
     <TouchableOpacity style={styles.card} onPress={onPress}>
       <View style={styles.cardAvatar}>
         <Text style={styles.cardAvatarText}>
-          {client.profile.full_name.charAt(0).toUpperCase()}
+          {client.profile?.full_name?.charAt(0).toUpperCase() ?? '?'}
         </Text>
       </View>
       <View style={styles.cardInfo}>
-        <Text style={styles.cardName}>{client.profile.full_name}</Text>
+        <Text style={styles.cardName}>{client.profile?.full_name ?? 'Client'}</Text>
         <Text style={styles.cardStatus}>
           {hasOnboarding ? '✓ Profil complété' : "⏳ En attente d'onboarding"}
         </Text>

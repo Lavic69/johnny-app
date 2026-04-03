@@ -29,7 +29,7 @@ export function useClients(coachId: string | null): ClientsState {
       .order('created_at', { ascending: false })
 
     if (error) setError(error.message)
-    else setClients((data as ClientWithProfile[]) ?? [])
+    else setClients(((data as ClientWithProfile[]) ?? []).filter((c) => c.profile != null))
     setLoading(false)
   }, [coachId])
 
