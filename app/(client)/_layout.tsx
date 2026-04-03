@@ -54,6 +54,8 @@ export default function ClientLayout() {
           ),
         }}
       />
+      {/* Caché de la tab bar — navigué via le client home */}
+      <Tabs.Screen name="onboarding" options={{ href: null }} />
     </Tabs>
   )
 }
