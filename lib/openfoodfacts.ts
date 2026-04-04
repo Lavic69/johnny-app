@@ -6,6 +6,8 @@ export interface OFFProduct {
   product_name: string
   nutriments: {
     'energy-kcal_100g'?: number
+    'energy_kcal_100g'?: number
+    'energy-kcal'?: number
     proteins_100g?: number
     carbohydrates_100g?: number
     fat_100g?: number
@@ -33,19 +35,24 @@ export async function searchByBarcode(barcode: string): Promise<FoodItem | null>
 export async function searchByText(query: string): Promise<FoodItem[]> {
   const encoded = encodeURIComponent(query)
   const json = await safeFetch(
-    `${BASE_URL}/cgi/search.pl?search_terms=${encoded}&search_simple=1&action=process&json=1&page_size=10&fields=product_name,nutriments,code`
+    `${BASE_URL}/cgi/search.pl?search_terms=${encoded}&search_simple=1&action=process&json=1&page_size=20`
   ) as any
   if (!json || !json.products) return []
   return (json.products as OFFProduct[])
-    .filter((p) => p.product_name && p.nutriments?.['energy-kcal_100g'] != null)
+    .filter((p) => p.product_name && p.product_name.trim().length > 0)
+    .slice(0, 10)
     .map((p) => mapProduct(p, p.code))
+}
+
+function getKcal(n: OFFProduct['nutriments']): number {
+  return n?.['energy-kcal_100g'] ?? n?.['energy_kcal_100g'] ?? n?.['energy-kcal'] ?? 0
 }
 
 function mapProduct(p: OFFProduct, barcode: string): FoodItem {
   return {
     name: p.product_name || 'Produit inconnu',
     barcode,
-    calories: Math.round(p.nutriments?.['energy-kcal_100g'] ?? 0),
+    calories: Math.round(getKcal(p.nutriments)),
     protein_g: Math.round((p.nutriments?.proteins_100g ?? 0) * 10) / 10,
     carbs_g: Math.round((p.nutriments?.carbohydrates_100g ?? 0) * 10) / 10,
     fat_g: Math.round((p.nutriments?.fat_100g ?? 0) * 10) / 10,

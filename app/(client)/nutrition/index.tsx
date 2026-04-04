@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { useRouter } from 'expo-router'
+import { useFocusEffect } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useClientId } from '@/hooks/useClientId'
@@ -32,7 +33,7 @@ export default function NutritionScreen() {
     setLoading(false)
   }, [clientId, today])
 
-  useEffect(() => { fetchLogs() }, [fetchLogs])
+  useFocusEffect(useCallback(() => { fetchLogs() }, [fetchLogs]))
 
   async function handleDelete(logId: string, foodIndex: number) {
     const log = logs.find((l) => l.id === logId)
@@ -143,7 +144,9 @@ function FoodRow({ food, onDelete }: { food: FoodItem; onDelete?: () => void }) 
     <View style={foodStyles.row}>
       <View style={foodStyles.info}>
         <Text style={foodStyles.name}>{food.name}</Text>
-        <Text style={foodStyles.quantity}>{food.quantity_g}g</Text>
+        {food.source !== 'ai' && (
+          <Text style={foodStyles.quantity}>{food.quantity_g}g</Text>
+        )}
       </View>
       <Text style={foodStyles.calories}>{Math.round(food.calories * ratio)} kcal</Text>
       {onDelete && (

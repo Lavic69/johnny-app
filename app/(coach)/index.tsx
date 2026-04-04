@@ -115,7 +115,7 @@ export default function CoachDashboard() {
           color="#ff8b1a"
         />
         <StatCard
-          icon="person-done"
+          icon="clipboard"
           label="Onboardés"
           value={stats?.onboardedClients ?? 0}
           color="#e11d48"

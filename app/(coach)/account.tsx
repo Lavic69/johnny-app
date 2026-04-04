@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '@/lib/supabase'
@@ -9,6 +10,11 @@ export default function CoachAccountScreen() {
   const { profile } = useAuth()
   const { coach } = useCoach(profile?.id ?? null)
   const { clients } = useClients(coach?.id ?? null)
+  const [email, setEmail] = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null))
+  }, [])
 
   const initials = profile?.full_name
     ? profile.full_name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
@@ -63,7 +69,7 @@ export default function CoachAccountScreen() {
         <Text style={styles.sectionTitle}>Informations</Text>
         <View style={styles.infoRow}>
           <Ionicons name="mail-outline" size={18} color="#64748b" />
-          <Text style={styles.infoText}>{profile?.id ? '—' : '—'}</Text>
+          <Text style={styles.infoText}>{email ?? '—'}</Text>
         </View>
       </View>
 

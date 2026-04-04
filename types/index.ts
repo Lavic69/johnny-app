@@ -92,6 +92,7 @@ export interface PersonalRecord {
 export interface FoodItem {
   name: string
   barcode?: string
+  source?: 'ai' | 'scan'
   calories: number
   protein_g: number
   carbs_g: number

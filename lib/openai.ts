@@ -68,6 +68,47 @@ FORMAT JSON ATTENDU :
 ]`
 }
 
+export async function analyzeMeal(
+  input: { text: string } | { imageBase64: string; mimeType: string }
+): Promise<{ name: string; calories: number; protein_g: number; carbs_g: number; fat_g: number }> {
+  const systemPrompt = `Tu es un nutritionniste expert. Estime les valeurs nutritionnelles TOTALES (pas pour 100g, mais pour la quantité décrite ou visible). Réponds UNIQUEMENT avec un JSON valide sans texte autour: {"name": "description courte", "calories": 0, "protein_g": 0, "carbs_g": 0, "fat_g": 0}`
+
+  let messages: OpenAI.Chat.ChatCompletionMessageParam[]
+
+  if ('text' in input) {
+    messages = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: `Voici ce qu'un client a mangé : "${input.text}"\n\nEstime les valeurs nutritionnelles totales de ce repas.` },
+    ]
+  } else {
+    messages = [{
+      role: 'user',
+      content: [
+        { type: 'image_url', image_url: { url: `data:${input.mimeType};base64,${input.imageBase64}` } },
+        { type: 'text', text: `${systemPrompt}\n\nAnalyse ce plat et estime les valeurs nutritionnelles totales de ce qui est visible.` },
+      ],
+    }]
+  }
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages,
+    response_format: { type: 'json_object' },
+  })
+
+  const content = response.choices[0].message.content
+  if (!content) throw new Error('Réponse IA vide')
+
+  const r = JSON.parse(content)
+  return {
+    name: String(r.name ?? 'Repas'),
+    calories: Math.round(Number(r.calories) || 0),
+    protein_g: Math.round((Number(r.protein_g) || 0) * 10) / 10,
+    carbs_g: Math.round((Number(r.carbs_g) || 0) * 10) / 10,
+    fat_g: Math.round((Number(r.fat_g) || 0) * 10) / 10,
+  }
+}
+
 export async function generateProgram(
   onboarding: ClientOnboarding,
   coachNotes: string

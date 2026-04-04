@@ -88,53 +88,177 @@ export default function ClientDetailScreen() {
 
       <ScrollView style={styles.content}>
         {activeTab === 'training' && <TrainingTab clientId={id} />}
-        {activeTab === 'nutrition' && <PlaceholderTab label="Nutrition — Phase 5" />}
+        {activeTab === 'nutrition' && <NutritionTab clientId={id} />}
         {activeTab === 'checkins' && <CheckinsTab clientId={id} />}
       </ScrollView>
     </View>
   )
 }
 
-function PlaceholderTab({ label }: { label: string }) {
+function TrainingTab({ clientId }: { clientId: string }) {
+  const { programs, loading: programsLoading } = useClientPrograms(clientId)
+  const [sessionLogs, setSessionLogs] = useState<any[]>([])
+  const [logsLoading, setLogsLoading] = useState(true)
+
+  useEffect(() => {
+    supabase
+      .from('session_logs')
+      .select('*, session:sessions(day_label, order_index)')
+      .eq('client_id', clientId)
+      .order('logged_at', { ascending: false })
+      .limit(20)
+      .then(({ data }) => {
+        setSessionLogs(data ?? [])
+        setLogsLoading(false)
+      })
+  }, [clientId])
+
+  if (programsLoading || logsLoading) return <ActivityIndicator color="#e11d48" style={{ marginTop: 40 }} />
+
   return (
-    <View style={styles.tabContent}>
-      <Text style={styles.tabContentText}>{label}</Text>
+    <View style={{ padding: 16 }}>
+      {/* Programme actif */}
+      {programs.length === 0 ? (
+        <View style={styles.tabContent}>
+          <Text style={styles.tabContentText}>Aucun programme pour ce client.</Text>
+        </View>
+      ) : (
+        <>
+          <Text style={sectionLabel.label}>Programme</Text>
+          {programs.map((program) => (
+            <View key={program.id} style={programStyles.card}>
+              <View style={programStyles.cardHeader}>
+                <Text style={programStyles.date}>
+                  {new Date(program.created_at).toLocaleDateString('fr-FR')}
+                </Text>
+                <View style={[programStyles.badge, program.status === 'approved' ? programStyles.approved : programStyles.draft]}>
+                  <Text style={programStyles.badgeText}>
+                    {program.status === 'approved' ? '✓ Approuvé' : 'Brouillon'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={programStyles.days}>
+                {Array.isArray(program.exercises) ? `${program.exercises.length} jours d'entraînement` : ''}
+              </Text>
+            </View>
+          ))}
+        </>
+      )}
+
+      {/* Séances effectuées */}
+      <Text style={[sectionLabel.label, { marginTop: 20 }]}>Séances effectuées</Text>
+      {sessionLogs.length === 0 ? (
+        <Text style={styles.tabContentText}>Aucune séance enregistrée.</Text>
+      ) : (
+        sessionLogs.map((log) => (
+          <View key={log.id} style={sessionStyles.card}>
+            <View style={sessionStyles.header}>
+              <Text style={sessionStyles.dayLabel}>{log.session?.day_label ?? 'Séance'}</Text>
+              <Text style={sessionStyles.date}>
+                {new Date(log.logged_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+              </Text>
+            </View>
+            {(log.sets as any[]).map((set: any, i: number) => (
+              <View key={i} style={sessionStyles.setRow}>
+                <Text style={sessionStyles.exercise}>{set.exercise}</Text>
+                <Text style={sessionStyles.setValues}>
+                  {set.weight > 0 ? `${set.weight}kg` : '—'} · {set.reps > 0 ? `${set.reps} reps` : '—'}{set.rpe > 0 ? ` · RPE ${set.rpe}` : ''}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ))
+      )}
     </View>
   )
 }
 
-function TrainingTab({ clientId }: { clientId: string }) {
-  const { programs, loading } = useClientPrograms(clientId)
+function NutritionTab({ clientId }: { clientId: string }) {
+  const [logs, setLogs] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const since = new Date()
+    since.setDate(since.getDate() - 7)
+    supabase
+      .from('food_logs')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('logged_date', since.toISOString().split('T')[0])
+      .order('logged_date', { ascending: false })
+      .then(({ data }) => {
+        setLogs(data ?? [])
+        setLoading(false)
+      })
+  }, [clientId])
 
   if (loading) return <ActivityIndicator color="#e11d48" style={{ marginTop: 40 }} />
 
-  if (programs.length === 0) {
+  if (logs.length === 0) {
     return (
       <View style={styles.tabContent}>
-        <Text style={styles.tabContentText}>Aucun programme pour ce client.</Text>
+        <Text style={styles.tabContentText}>Aucune entrée nutritionnelle cette semaine.</Text>
       </View>
     )
   }
 
+  // Grouper par date
+  const byDate: Record<string, any[]> = {}
+  for (const log of logs) {
+    if (!byDate[log.logged_date]) byDate[log.logged_date] = []
+    byDate[log.logged_date].push(log)
+  }
+
+  const MEAL_LABELS: Record<string, string> = {
+    breakfast: 'Petit-déjeuner',
+    lunch: 'Déjeuner',
+    dinner: 'Dîner',
+    snack: 'Collation',
+  }
+
   return (
     <View style={{ padding: 16 }}>
-      {programs.map((program) => (
-        <View key={program.id} style={programStyles.card}>
-          <View style={programStyles.cardHeader}>
-            <Text style={programStyles.date}>
-              {new Date(program.created_at).toLocaleDateString('fr-FR')}
-            </Text>
-            <View style={[programStyles.badge, program.status === 'approved' ? programStyles.approved : programStyles.draft]}>
-              <Text style={programStyles.badgeText}>
-                {program.status === 'approved' ? '✓ Approuvé' : 'Brouillon'}
+      {Object.entries(byDate).map(([date, dayLogs]) => {
+        const allFoods = dayLogs.flatMap((l) => l.foods)
+        const totals = allFoods.reduce(
+          (acc: any, f: any) => {
+            const ratio = f.source === 'ai' ? 1 : f.quantity_g / 100
+            return {
+              calories: acc.calories + f.calories * ratio,
+              protein: acc.protein + f.protein_g * ratio,
+            }
+          },
+          { calories: 0, protein: 0 }
+        )
+        return (
+          <View key={date} style={nutritionStyles.dayCard}>
+            <View style={nutritionStyles.dayHeader}>
+              <Text style={nutritionStyles.dayDate}>
+                {new Date(date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </Text>
+              <Text style={nutritionStyles.dayTotals}>
+                {Math.round(totals.calories)} kcal · {Math.round(totals.protein)}g prot
               </Text>
             </View>
+            {dayLogs.map((log: any) => (
+              <View key={log.id} style={nutritionStyles.mealSection}>
+                <Text style={nutritionStyles.mealLabel}>{MEAL_LABELS[log.meal_type] ?? log.meal_type}</Text>
+                {(log.foods as any[]).map((food: any, i: number) => (
+                  <View key={i} style={nutritionStyles.foodRow}>
+                    <Text style={nutritionStyles.foodName}>{food.name}</Text>
+                    <Text style={nutritionStyles.foodCal}>
+                      {food.source === 'ai'
+                        ? `${food.calories} kcal`
+                        : `${food.quantity_g}g · ${Math.round(food.calories * food.quantity_g / 100)} kcal`
+                      }
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ))}
           </View>
-          <Text style={programStyles.days}>
-            {Array.isArray(program.exercises) ? `${program.exercises.length} jours d'entraînement` : ''}
-          </Text>
-        </View>
-      ))}
+        )
+      })}
     </View>
   )
 }
@@ -179,6 +303,32 @@ function ScoreBadge({ label, value }: { label: string; value: number }) {
     </View>
   )
 }
+
+const sectionLabel = StyleSheet.create({
+  label: { color: '#475569', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 },
+})
+
+const sessionStyles = StyleSheet.create({
+  card: { backgroundColor: '#334155', borderRadius: 16, padding: 16, marginBottom: 10 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  dayLabel: { color: '#f8fafc', fontWeight: '700', fontSize: 14, flex: 1 },
+  date: { color: '#64748b', fontSize: 12 },
+  setRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 5, borderTopWidth: 1, borderTopColor: '#1e293b' },
+  exercise: { color: '#94a3b8', fontSize: 13, flex: 1 },
+  setValues: { color: '#f8fafc', fontSize: 13, fontWeight: '600' },
+})
+
+const nutritionStyles = StyleSheet.create({
+  dayCard: { backgroundColor: '#334155', borderRadius: 16, padding: 16, marginBottom: 12 },
+  dayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  dayDate: { color: '#f8fafc', fontWeight: '700', fontSize: 14, textTransform: 'capitalize', flex: 1 },
+  dayTotals: { color: '#00bb7f', fontWeight: '700', fontSize: 13 },
+  mealSection: { marginBottom: 8 },
+  mealLabel: { color: '#64748b', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  foodRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
+  foodName: { color: '#94a3b8', fontSize: 13, flex: 1 },
+  foodCal: { color: '#f8fafc', fontSize: 13 },
+})
 
 const checkinStyles = StyleSheet.create({
   card: { backgroundColor: '#334155', borderRadius: 16, padding: 16, marginBottom: 10 },
