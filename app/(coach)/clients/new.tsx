@@ -11,7 +11,9 @@ import { useCoach } from '@/hooks/useCoach'
 
 function generateCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+  const bytes = new Uint8Array(6)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (b) => chars[b % chars.length]).join('')
 }
 
 function formatCode(code: string): string {
