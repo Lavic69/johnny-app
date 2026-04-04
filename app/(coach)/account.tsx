@@ -5,11 +5,13 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useCoach } from '@/hooks/useCoach'
 import { useClients } from '@/hooks/useClients'
+import { useAIConsent } from '@/hooks/useAIConsent'
 
 export default function CoachAccountScreen() {
   const { profile } = useAuth()
   const { coach } = useCoach(profile?.id ?? null)
   const { clients } = useClients(coach?.id ?? null)
+  const { consentState, revoke } = useAIConsent(profile?.id)
   const [email, setEmail] = useState<string | null>(null)
 
   useEffect(() => {
@@ -110,6 +112,26 @@ export default function CoachAccountScreen() {
         </View>
       </View>
 
+      {/* Données IA */}
+      {consentState === 'accepted' && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Intelligence artificielle</Text>
+          <TouchableOpacity style={styles.revokeRow} onPress={() => {
+            Alert.alert(
+              'Révoquer le consentement IA',
+              'Les fonctions de génération de programme IA seront désactivées. Tu pourras les réactiver à tout moment.',
+              [
+                { text: 'Annuler', style: 'cancel' },
+                { text: 'Révoquer', style: 'destructive', onPress: revoke },
+              ]
+            )
+          }}>
+            <Ionicons name="ban-outline" size={18} color="#ff8b1a" />
+            <Text style={styles.revokeText}>Révoquer l'accès à l'IA (OpenAI)</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Actions */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Compte</Text>
@@ -187,4 +209,7 @@ const styles = StyleSheet.create({
   actionTextDanger: { color: '#e11d48', fontSize: 15, fontWeight: '600' },
   deleteRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 16, marginTop: 4 },
   deleteText: { color: '#475569', fontSize: 14, fontWeight: '500' },
+
+  revokeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1e293b', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#ff8b1a30' },
+  revokeText: { color: '#ff8b1a', fontSize: 14, fontWeight: '600' },
 })

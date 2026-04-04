@@ -9,6 +9,9 @@ import * as ImagePicker from 'expo-image-picker'
 import { Ionicons } from '@expo/vector-icons'
 import { analyzeMeal } from '@/lib/openai'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/hooks/useAuth'
+import { useAIConsent } from '@/hooks/useAIConsent'
+import AIConsentModal from '@/components/AIConsentModal'
 import type { FoodItem, MealType } from '@/types'
 
 type Mode = 'text' | 'photo'
@@ -27,6 +30,8 @@ export default function AddFoodScreen() {
     date: string
   }>()
   const router = useRouter()
+  const { profile } = useAuth()
+  const { consentState, accept, decline } = useAIConsent(profile?.id)
 
   const [mode, setMode] = useState<Mode>('text')
   const [description, setDescription] = useState('')
@@ -34,8 +39,10 @@ export default function AddFoodScreen() {
   const [analyzing, setAnalyzing] = useState(false)
   const [result, setResult] = useState<FoodItem | null>(null)
   const [saving, setSaving] = useState(false)
+  const [consentModalVisible, setConsentModalVisible] = useState(false)
+  const [pendingAnalysis, setPendingAnalysis] = useState<'text' | 'photo' | null>(null)
 
-  async function handleAnalyzeText() {
+  async function runAnalyzeText() {
     if (!description.trim()) return
     setAnalyzing(true)
     try {
@@ -46,6 +53,42 @@ export default function AddFoodScreen() {
     } finally {
       setAnalyzing(false)
     }
+  }
+
+  async function runAnalyzePhoto() {
+    if (!image) return
+    setAnalyzing(true)
+    try {
+      const data = await analyzeMeal({ imageBase64: image.base64, mimeType: image.mimeType })
+      setResult({ ...data, quantity_g: 100, source: 'ai' })
+    } catch {
+      Alert.alert('Erreur', "Impossible d'analyser la photo. Réessaie.")
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  async function handleConsentAccept() {
+    await accept()
+    setConsentModalVisible(false)
+    if (pendingAnalysis === 'text') await runAnalyzeText()
+    else if (pendingAnalysis === 'photo') await runAnalyzePhoto()
+    setPendingAnalysis(null)
+  }
+
+  function requestAnalysis(type: 'text' | 'photo') {
+    if (consentState === 'pending') {
+      setPendingAnalysis(type)
+      setConsentModalVisible(true)
+      return
+    }
+    if (type === 'text') runAnalyzeText()
+    else runAnalyzePhoto()
+  }
+
+  async function handleAnalyzeText() {
+    if (!description.trim()) return
+    requestAnalysis('text')
   }
 
   async function handleTakePhoto() {
@@ -80,15 +123,7 @@ export default function AddFoodScreen() {
 
   async function handleAnalyzePhoto() {
     if (!image) return
-    setAnalyzing(true)
-    try {
-      const data = await analyzeMeal({ imageBase64: image.base64, mimeType: image.mimeType })
-      setResult({ ...data, quantity_g: 100, source: 'ai' })
-    } catch {
-      Alert.alert('Erreur', "Impossible d'analyser la photo. Réessaie.")
-    } finally {
-      setAnalyzing(false)
-    }
+    requestAnalysis('photo')
   }
 
   async function handleSave() {
@@ -192,24 +227,35 @@ export default function AddFoodScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Mode tabs */}
-      <View style={styles.tabs}>
-        <ModeTab
-          label="Décrire"
-          icon="create-outline"
-          active={mode === 'text'}
-          onPress={() => setMode('text')}
-        />
-        <ModeTab
-          label="Photo"
-          icon="camera-outline"
-          active={mode === 'photo'}
-          onPress={() => setMode('photo')}
-        />
-      </View>
+      {/* Mode tabs — hidden when AI consent declined */}
+      {consentState !== 'declined' && (
+        <View style={styles.tabs}>
+          <ModeTab
+            label="Décrire"
+            icon="create-outline"
+            active={mode === 'text'}
+            onPress={() => setMode('text')}
+          />
+          <ModeTab
+            label="Photo"
+            icon="camera-outline"
+            active={mode === 'photo'}
+            onPress={() => setMode('photo')}
+          />
+        </View>
+      )}
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {mode === 'text' && (
+        {consentState === 'declined' && (
+          <View style={styles.aiDisabledBox}>
+            <Ionicons name="ban-outline" size={24} color="#475569" />
+            <Text style={styles.aiDisabledTitle}>Analyse IA désactivée</Text>
+            <Text style={styles.aiDisabledHint}>
+              Tu as refusé le partage de données avec OpenAI. Utilise le scanner de code-barres ou gère tes préférences dans ton profil.
+            </Text>
+          </View>
+        )}
+        {consentState !== 'declined' && mode === 'text' && (
           <>
             <Text style={styles.modeTitle}>Décris ce que tu as mangé</Text>
             <Text style={styles.modeHint}>
@@ -246,7 +292,7 @@ export default function AddFoodScreen() {
           </>
         )}
 
-        {mode === 'photo' && (
+        {consentState !== 'declined' && mode === 'photo' && (
           <>
             <Text style={styles.modeTitle}>Prends ton repas en photo</Text>
             <Text style={styles.modeHint}>
@@ -293,6 +339,12 @@ export default function AddFoodScreen() {
           </>
         )}
       </ScrollView>
+      <AIConsentModal
+        visible={consentModalVisible}
+        dataDescription="La description textuelle ou la photo de ton repas pour estimer les calories et macronutriments."
+        onAccept={handleConsentAccept}
+        onDecline={() => { decline(); setConsentModalVisible(false); setPendingAnalysis(null) }}
+      />
     </KeyboardAvoidingView>
   )
 }
@@ -374,6 +426,14 @@ const styles = StyleSheet.create({
 
   retryBtn: { alignItems: 'center', paddingVertical: 14 },
   retryText: { color: '#64748b', fontSize: 14 },
+
+  aiDisabledBox: {
+    alignItems: 'center', gap: 10, padding: 32,
+    backgroundColor: '#1e293b', borderRadius: 16,
+    borderWidth: 1, borderColor: '#334155', marginTop: 8,
+  },
+  aiDisabledTitle: { color: '#64748b', fontSize: 16, fontWeight: '700' },
+  aiDisabledHint: { color: '#475569', fontSize: 13, lineHeight: 19, textAlign: 'center' },
 
   // Résultat
   resultContainer: { padding: 24 },

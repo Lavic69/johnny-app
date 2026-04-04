@@ -8,6 +8,8 @@ import { generateProgram, type ProgramDay } from '@/lib/openai'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useCoach } from '@/hooks/useCoach'
+import { useAIConsent } from '@/hooks/useAIConsent'
+import AIConsentModal from '@/components/AIConsentModal'
 import type { ClientOnboarding } from '@/types'
 
 export default function GenerateProgramScreen() {
@@ -18,6 +20,7 @@ export default function GenerateProgramScreen() {
   const router = useRouter()
   const { profile } = useAuth()
   const { coach } = useCoach(profile?.id ?? null)
+  const { consentState, accept, decline } = useAIConsent(profile?.id)
 
   const onboarding: ClientOnboarding = JSON.parse(onboardingJson ?? '{}')
 
@@ -25,8 +28,9 @@ export default function GenerateProgramScreen() {
   const [generating, setGenerating] = useState(false)
   const [program, setProgram] = useState<ProgramDay[] | null>(null)
   const [saving, setSaving] = useState(false)
+  const [consentModalVisible, setConsentModalVisible] = useState(false)
 
-  async function handleGenerate() {
+  async function runGenerate() {
     setGenerating(true)
     setProgram(null)
     try {
@@ -37,6 +41,21 @@ export default function GenerateProgramScreen() {
     } finally {
       setGenerating(false)
     }
+  }
+
+  async function handleGenerate() {
+    if (consentState === 'pending') { setConsentModalVisible(true); return }
+    if (consentState === 'declined') {
+      Alert.alert('IA désactivée', 'Tu as refusé le partage de données avec OpenAI. Va dans ton profil pour modifier ce choix.')
+      return
+    }
+    await runGenerate()
+  }
+
+  async function handleConsentAccept() {
+    await accept()
+    setConsentModalVisible(false)
+    await runGenerate()
   }
 
   async function handleApprove() {
@@ -113,6 +132,12 @@ export default function GenerateProgramScreen() {
           </TouchableOpacity>
         </>
       )}
+      <AIConsentModal
+        visible={consentModalVisible}
+        dataDescription="Le profil du client (objectif, niveau, blessures, matériel) et tes notes pour générer son programme d'entraînement personnalisé."
+        onAccept={handleConsentAccept}
+        onDecline={() => { decline(); setConsentModalVisible(false) }}
+      />
     </ScrollView>
   )
 }
