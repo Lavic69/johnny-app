@@ -81,6 +81,8 @@ Statuts : ✅ Validé · ❌ Échoué · 🔲 Non testé · ⚠️ Partiel/Incer
 | 6.3 | Coach peut voir le programme avant approbation | ✅ | Ecran de review construit |
 | 6.4 | Coach approuve le programme → statut passe à "approved" | ✅ | Testé |
 | 6.5 | Programme approuvé visible côté client | ✅ | Confirmé |
+| 6.6 | Modale consentement IA s'affiche si consentement pending → accepter lance la génération | 🔲 | Implémenté, non testé |
+| 6.7 | Si consentement refusé → bouton génération bloqué avec message | 🔲 | Implémenté, non testé |
 
 ---
 
@@ -92,6 +94,8 @@ Statuts : ✅ Validé · ❌ Échoué · 🔲 Non testé · ⚠️ Partiel/Incer
 | 7.2 | Affiche email du coach | ✅ | Corrigé (récupéré via auth.getUser) |
 | 7.3 | Badge statut actif / en attente | ✅ | Testé |
 | 7.4 | Bouton déconnexion coach | ✅ | Testé |
+| 7.5 | Suppression de compte (double confirmation → Edge Function → cascade DB) | 🔲 | Implémenté, non testé |
+| 7.6 | Révocation consentement IA (visible si accepté, double confirmation) | 🔲 | Implémenté, non testé |
 
 ---
 
@@ -140,6 +144,8 @@ Statuts : ✅ Validé · ❌ Échoué · 🔲 Non testé · ⚠️ Partiel/Incer
 | 10.10 | Mode "Scanner" : scanner un code-barres → quantité → journal | ✅ | Validé |
 | 10.11 | Supprimer un aliment d'un repas | ✅ | Validé |
 | 10.12 | Journal persistant par jour (les données du jour restent) | ✅ | Confirmé |
+| 10.13 | Consentement IA pending → modale avant première analyse texte/photo | 🔲 | Implémenté, non testé |
+| 10.14 | Consentement IA refusé → onglets Décrire + Photo masqués, Scanner accessible | 🔲 | Implémenté, non testé |
 
 ---
 
@@ -165,6 +171,25 @@ Statuts : ✅ Validé · ❌ Échoué · 🔲 Non testé · ⚠️ Partiel/Incer
 | 12.5 | Mode édition : modifier prénom, nom, âge, poids, taille, blessures | 🔲 | Construit, jamais testé |
 | 12.6 | Enregistrement des modifications | 🔲 | Construit, jamais testé |
 | 12.7 | Bouton déconnexion client | ✅ | Testé |
+| 12.8 | Suppression de compte (double confirmation → Edge Function → cascade DB) | 🔲 | Implémenté, non testé |
+| 12.9 | Révocation consentement IA (visible si accepté, double confirmation) | 🔲 | Implémenté, non testé |
+
+---
+
+## 13. Sécurité & Compliance Store
+
+| # | Fonctionnalité | Statut | Notes |
+|---|---------------|--------|-------|
+| 13.1 | Clé OpenAI retirée du bundle → Edge Function `openai-proxy` | ✅ | Vérifié en code |
+| 13.2 | Trigger `handle_new_user` : rôle hardcodé à `'client'` (pas de privilege escalation) | ✅ | Vérifié en DB |
+| 13.3 | RLS + policies sur toutes les tables (28 policies actives) | ✅ | Vérifié via pg_policies |
+| 13.4 | Codes invitation générés avec `crypto.getRandomValues()` (CSPRNG) | ✅ | Vérifié en code |
+| 13.5 | Privacy Manifest iOS (`NSPrivacyAccessedAPITypes`) | ✅ | Dans `app.json` |
+| 13.6 | Suppression de compte in-app (Apple obligatoire) — coach + client | 🔲 | Implémenté, à tester sur device |
+| 13.7 | Consentement IA — modale nomme OpenAI explicitement (Guideline 5.1.2(i)) | 🔲 | Implémenté, à tester sur device |
+| 13.8 | Révocation du consentement IA depuis le profil | 🔲 | Implémenté, à tester sur device |
+| 13.9 | Privacy Policy URL renseignée dans App Store Connect / Play Console | 🔲 | Étape process — à faire avant soumission |
+| 13.10 | `appleId` / `ascAppId` / `appleTeamId` dans `eas.json` | 🔲 | À renseigner au moment de la soumission |
 
 ---
 
@@ -177,14 +202,15 @@ Statuts : ✅ Validé · ❌ Échoué · 🔲 Non testé · ⚠️ Partiel/Incer
 | Coach — Dashboard | 3 | 3 | 0 | 0 |
 | Coach — Clients | 8 | 8 | 0 | 0 |
 | Coach — Suivi client | 5 | 5 | 0 | 0 |
-| Coach — Programmes | 5 | 5 | 0 | 0 |
-| Coach — Compte | 4 | 4 | 0 | 0 |
+| Coach — Programmes | 7 | 5 | 0 | 2 |
+| Coach — Compte | 6 | 4 | 0 | 2 |
 | Onboarding | 9 | 9 | 0 | 0 |
 | Client — Programme | 6 | 6 | 0 | 0 |
-| Client — Nutrition | 12 | 12 | 0 | 0 |
+| Client — Nutrition | 14 | 12 | 0 | 2 |
 | Client — Check-in | 4 | 1 | 0 | 3 |
-| Client — Compte | 7 | 5 | 0 | 2 |
-| **TOTAL** | **80** | **74** | **1** | **5** |
+| Client — Compte | 9 | 5 | 0 | 4 |
+| Sécurité & Compliance | 10 | 5 | 0 | 5 |
+| **TOTAL** | **98** | **79** | **1** | **18** |
 
 ---
 
@@ -192,7 +218,9 @@ Statuts : ✅ Validé · ❌ Échoué · 🔲 Non testé · ⚠️ Partiel/Incer
 
 | # | Priorité | Sujet |
 |---|----------|-------|
-| 5.2 / 5.3 / 5.4 | Haute | Suivi client coach : séances effectuées + nutrition (implémenté aujourd'hui) |
+| 13.6 / 13.7 / 13.8 | **Critique** | Suppression compte + consentement IA + révocation (obligatoire Apple) |
+| 5.2 / 5.3 / 5.4 | Haute | Suivi client coach : séances effectuées + nutrition |
 | 11.2 / 11.3 / 11.4 | Moyenne | Check-in client complet end-to-end |
 | 12.5 / 12.6 | Moyenne | Édition du profil client |
+| 6.6 / 6.7 / 10.13 / 10.14 | Moyenne | Flow consentement IA (génération programme + analyse nutrition) |
 | 1.5 | Basse | Écran d'attente coach (compte en attente d'activation) |

@@ -190,15 +190,43 @@ function generateCode(): string {
 | `eas.json` (EAS Build/Submit) | `eas.json` | ✅ |
 | Icon + Splash + Adaptive Icon | `assets/` | ✅ |
 | `expo-barcode-scanner` retiré (déprécié) | `package.json` | ✅ |
+| **Suppression de compte in-app** (Apple obligatoire) | `app/(coach)/account.tsx` · `app/(client)/account.tsx` · `supabase/functions/delete-account/` | ✅ |
+| **Consentement IA OpenAI** (Guideline 5.1.2(i), nov. 2025) | `components/AIConsentModal.tsx` · `hooks/useAIConsent.ts` + intégration | ✅ |
+
+### Détail — Suppression de compte (`delete-account` Edge Function)
+
+- Double confirmation native (Alert × 2) avant déclenchement
+- Edge Function vérifie le JWT utilisateur (pas de suppression non-authentifiée)
+- Suppression via `auth.admin.deleteUser()` avec `service_role` → CASCADE DB supprime automatiquement profiles → coaches/clients → toutes les données liées
+- Disponible sur les deux espaces (coach et client)
+- **Commit :** implémenté dans ce sprint — à tester sur device avant soumission
+
+### Détail — Consentement IA (Apple Guideline 5.1.2(i))
+
+Obligations Apple respectées :
+- Nomme explicitement **OpenAI** (openai.com) comme fournisseur tiers américain
+- Décrit précisément les données envoyées pour chaque usage (programme / analyse repas)
+- Bouton "Refuser" accessible, pas caché, même taille que "Accepter"
+- Fonctions core (barcode scan, consultation programme) restent accessibles si refus
+- Révocation possible depuis le profil à tout moment
+
+Persistance : `profiles.ai_consent` (boolean) + `profiles.ai_consent_at` (timestamptz) — migration `004_ai_consent` appliquée en DB.
+
+Points d'intégration :
+| Écran | Comportement si `pending` | Comportement si `declined` |
+|-------|--------------------------|---------------------------|
+| `generate.tsx` (coach) | Modale avant génération, puis génère si accepté | Alert bloquant, bouton toujours visible |
+| `add.tsx` (client) | Modale avant analyse texte/photo | Onglets Décrire + Photo masqués, Scanner accessible |
+| `account.tsx` (coach + client) | — | Bouton "Révoquer" visible si `accepted` |
+
+**Commit :** `7811431`
 
 ### Restant (hors code — process)
 
 | # | Item | Obligation | Quand |
 |---|------|-----------|-------|
 | 1 | **Privacy Policy URL** | Apple + Google | À renseigner dans App Store Connect / Play Console |
-| 2 | **Consentement IA OpenAI** (Guideline 5.1.2(i)) | Apple — nov. 2025 | Avant première soumission |
-| 3 | **Suppression de compte in-app** | Apple — obligatoire | Avant première soumission |
-| 4 | **`appleId` / `ascAppId` / `appleTeamId`** dans `eas.json` | EAS Submit | Au moment de la soumission |
+| 2 | **`appleId` / `ascAppId` / `appleTeamId`** dans `eas.json` | EAS Submit | Au moment de la soumission |
 
 ---
 
@@ -225,11 +253,13 @@ function generateCode(): string {
 | `002_admin_policies` | Policies admin (via fonction `is_admin()`) |
 | `003_security_fixes` | Fix trigger + policies manquantes (ce sprint) |
 | `fix_trigger_role_and_invite_update` | Fix final trigger + UPDATE invite_tokens |
+| `004_ai_consent` | Colonnes `ai_consent` (boolean) + `ai_consent_at` (timestamptz) sur `profiles` |
 
 ### Edge Functions déployées
 | Fonction | Version | JWT requis |
 |----------|---------|-----------|
 | `openai-proxy` | v1 | ✅ Oui |
+| `delete-account` | v1 | ✅ Oui (service_role pour suppression) |
 
 ---
 
@@ -239,4 +269,9 @@ function generateCode(): string {
 
 **Score après audit :** 0 finding ouvert. Tous les vecteurs d'attaque identifiés ont été corrigés et vérifiés en DB et en code.
 
-**L'app est prête techniquement pour une soumission store.** Les 3 points restants (privacy policy, consentement IA, suppression compte) sont des étapes de process et de UX, pas des blocages de sécurité du code.
+**Compliance Apple — mise à jour :**
+- ✅ Suppression de compte in-app (Apple obligatoire) — Edge Function + double confirmation
+- ✅ Consentement IA OpenAI (Guideline 5.1.2(i), nov. 2025) — modale + révocation + persistance DB
+- 🔲 Privacy Policy URL — à renseigner dans App Store Connect avant soumission
+
+**L'app est prête techniquement pour une soumission store.** Il reste un seul point de process : renseigner l'URL de la politique de confidentialité dans App Store Connect / Play Console.
