@@ -102,6 +102,43 @@ export default function ClientAccountScreen() {
     ])
   }
 
+  async function handleDeleteAccount() {
+    Alert.alert(
+      'Supprimer mon compte',
+      'Cette action est irréversible. Toutes tes données (profil, nutrition, séances, programme) seront définitivement supprimées.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Dernière confirmation',
+              'Es-tu certain de vouloir supprimer définitivement ton compte ?',
+              [
+                { text: 'Annuler', style: 'cancel' },
+                {
+                  text: 'Oui, supprimer',
+                  style: 'destructive',
+                  onPress: confirmDeleteAccount,
+                },
+              ]
+            )
+          },
+        },
+      ]
+    )
+  }
+
+  async function confirmDeleteAccount() {
+    const { error } = await supabase.functions.invoke('delete-account')
+    if (error) {
+      Alert.alert('Erreur', "La suppression a échoué. Réessaie ou contacte le support.")
+      return
+    }
+    await supabase.auth.signOut()
+  }
+
   const initials = profile?.full_name
     ? profile.full_name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
     : '?'
@@ -224,11 +261,15 @@ export default function ClientAccountScreen() {
         </View>
       )}
 
-      {/* Déconnexion */}
+      {/* Compte */}
       <SectionTitle title="Compte" />
       <TouchableOpacity style={styles.logoutRow} onPress={handleLogout}>
         <Ionicons name="log-out-outline" size={20} color="#e11d48" />
         <Text style={styles.logoutText}>Se déconnecter</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.deleteRow} onPress={handleDeleteAccount}>
+        <Ionicons name="trash-outline" size={18} color="#475569" />
+        <Text style={styles.deleteText}>Supprimer mon compte</Text>
       </TouchableOpacity>
     </ScrollView>
   )
@@ -307,4 +348,6 @@ const styles = StyleSheet.create({
 
   logoutRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1e293b', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#e11d4830', marginTop: 4 },
   logoutText: { color: '#e11d48', fontSize: 15, fontWeight: '600' },
+  deleteRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 16, marginTop: 8 },
+  deleteText: { color: '#475569', fontSize: 14, fontWeight: '500' },
 })

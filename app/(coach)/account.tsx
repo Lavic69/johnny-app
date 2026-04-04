@@ -31,6 +31,43 @@ export default function CoachAccountScreen() {
     ])
   }
 
+  async function handleDeleteAccount() {
+    Alert.alert(
+      'Supprimer mon compte',
+      'Cette action est irréversible. Ton compte coach, tous tes clients et leurs données seront définitivement supprimés.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Dernière confirmation',
+              'Es-tu certain de vouloir supprimer définitivement ton compte ?',
+              [
+                { text: 'Annuler', style: 'cancel' },
+                {
+                  text: 'Oui, supprimer',
+                  style: 'destructive',
+                  onPress: confirmDeleteAccount,
+                },
+              ]
+            )
+          },
+        },
+      ]
+    )
+  }
+
+  async function confirmDeleteAccount() {
+    const { error } = await supabase.functions.invoke('delete-account')
+    if (error) {
+      Alert.alert('Erreur', "La suppression a échoué. Réessaie ou contacte le support.")
+      return
+    }
+    await supabase.auth.signOut()
+  }
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Avatar + nom */}
@@ -79,6 +116,10 @@ export default function CoachAccountScreen() {
         <TouchableOpacity style={styles.actionRow} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={20} color="#e11d48" />
           <Text style={styles.actionTextDanger}>Se déconnecter</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.deleteRow} onPress={handleDeleteAccount}>
+          <Ionicons name="trash-outline" size={18} color="#475569" />
+          <Text style={styles.deleteText}>Supprimer mon compte</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -144,4 +185,6 @@ const styles = StyleSheet.create({
     padding: 16, borderWidth: 1, borderColor: '#e11d4830',
   },
   actionTextDanger: { color: '#e11d48', fontSize: 15, fontWeight: '600' },
+  deleteRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 16, marginTop: 4 },
+  deleteText: { color: '#475569', fontSize: 14, fontWeight: '500' },
 })
