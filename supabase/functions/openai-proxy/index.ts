@@ -25,9 +25,9 @@ Deno.serve(async (req) => {
     })
   }
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  const supabaseAnon = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!)
   const token = authHeader.replace('Bearer ', '')
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+  const { data: { user }, error: authError } = await supabaseAnon.auth.getUser(token)
 
   if (authError || !user) {
     return new Response(JSON.stringify({ error: 'Token invalide' }), {
@@ -37,7 +37,10 @@ Deno.serve(async (req) => {
   }
 
   // 2. Vérifier le rôle — seuls coach et client peuvent appeler OpenAI
-  const { data: profile } = await supabase
+  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+  const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('role')
     .eq('id', user.id)
