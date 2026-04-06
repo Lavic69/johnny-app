@@ -17,7 +17,7 @@ export default function ClientLayout() {
 
     supabase
       .from('clients')
-      .select('coach:coaches(id, status)')
+      .select('coach:coaches!coach_id(id, status)')
       .eq('profile_id', profile.id)
       .single()
       .then(({ data }) => {
