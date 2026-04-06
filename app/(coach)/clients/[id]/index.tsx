@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { useClientPrograms } from '@/hooks/usePrograms'
@@ -26,6 +26,43 @@ export default function ClientDetailScreen() {
         setLoading(false)
       })
   }, [id])
+
+  async function handleDeleteClient() {
+    if (!client) return
+    Alert.alert(
+      'Supprimer ce client',
+      `Es-tu sûr de vouloir supprimer ${client.profile.full_name} ? Son compte, son programme et toutes ses données seront définitivement supprimés.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: () =>
+            Alert.alert(
+              'Dernière confirmation',
+              'Cette action est irréversible.',
+              [
+                { text: 'Annuler', style: 'cancel' },
+                {
+                  text: 'Oui, supprimer',
+                  style: 'destructive',
+                  onPress: async () => {
+                    const { error } = await supabase.functions.invoke('delete-client', {
+                      body: { clientId: client.id },
+                    })
+                    if (error) {
+                      Alert.alert('Erreur', "La suppression a échoué. Réessaie ou contacte le support.")
+                      return
+                    }
+                    router.back()
+                  },
+                },
+              ]
+            ),
+        },
+      ]
+    )
+  }
 
   if (loading) {
     return <View style={styles.center}><ActivityIndicator color="#e11d48" /></View>
@@ -56,20 +93,25 @@ export default function ClientDetailScreen() {
             </Text>
           </View>
         </View>
-        {onboarding && (
-          <TouchableOpacity
-            style={styles.generateBtn}
-            onPress={() => router.push({
-              pathname: '/(coach)/programs/generate',
-              params: {
-                clientId: client.id,
-                onboardingJson: JSON.stringify(onboarding),
-              },
-            })}
-          >
-            <Text style={styles.generateBtnText}>✨ Générer un programme</Text>
+        <View style={styles.headerActions}>
+          {onboarding && (
+            <TouchableOpacity
+              style={styles.generateBtn}
+              onPress={() => router.push({
+                pathname: '/(coach)/programs/generate',
+                params: {
+                  clientId: client.id,
+                  onboardingJson: JSON.stringify(onboarding),
+                },
+              })}
+            >
+              <Text style={styles.generateBtnText}>✨ Générer un programme</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.deleteClientBtn} onPress={handleDeleteClient}>
+            <Text style={styles.deleteClientText}>Supprimer ce client</Text>
           </TouchableOpacity>
-        )}
+        </View>
       </View>
 
       <View style={styles.tabs}>
@@ -369,6 +411,9 @@ const styles = StyleSheet.create({
   content: { flex: 1 },
   tabContent: { padding: 40, alignItems: 'center' },
   tabContentText: { color: '#64748b', textAlign: 'center' },
-  generateBtn: { backgroundColor: '#3080ff', borderRadius: 12, padding: 12, alignItems: 'center', marginTop: 16 },
+  headerActions: { marginTop: 16, gap: 8 },
+  generateBtn: { backgroundColor: '#3080ff', borderRadius: 12, padding: 12, alignItems: 'center' },
   generateBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  deleteClientBtn: { alignItems: 'center', padding: 10 },
+  deleteClientText: { color: '#475569', fontSize: 13, fontWeight: '500' },
 })
