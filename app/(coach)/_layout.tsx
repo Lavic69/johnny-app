@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { Tabs } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '@/hooks/useAuth'
@@ -9,8 +9,13 @@ export default function CoachLayout() {
   const { profile } = useAuth()
   const { coach, loading } = useCoach(profile?.id ?? null)
 
-  // Compte désactivé ou en attente → écran bloquant
-  if (!loading && coach && coach.status !== 'active') {
+  // Attendre que le statut soit chargé avant d'afficher quoi que ce soit
+  if (loading) {
+    return <View style={styles.blocked}><ActivityIndicator color="#e11d48" /></View>
+  }
+
+  // Pas de coach trouvé ou statut !== active → écran bloquant
+  if (!coach || coach.status !== 'active') {
     return (
       <View style={styles.blocked}>
         <View style={styles.iconWrap}>
