@@ -17,7 +17,9 @@ export default function SessionLogScreen() {
   }>()
   const router = useRouter()
 
-  // dayJson peut être un array si Expo Router cumule des navigations
+  // Expo Router peut passer ces params en array lors de navigations multiples
+  const programIdStr = Array.isArray(programId) ? programId[0] : (programId ?? '')
+  const clientIdStr = Array.isArray(clientId) ? clientId[0] : (clientId ?? '')
   const dayJsonStr = Array.isArray(dayJson) ? dayJson[0] : (dayJson ?? '{}')
   const day: ProgramDay = JSON.parse(dayJsonStr)
   const items = day.items ?? []
@@ -35,7 +37,7 @@ export default function SessionLogScreen() {
       const { data: sessionData } = await supabase
         .from('sessions')
         .select('id')
-        .eq('program_id', programId)
+        .eq('program_id', programIdStr)
         .eq('order_index', day.order)
         .maybeSingle()
 
@@ -45,7 +47,7 @@ export default function SessionLogScreen() {
         .from('session_logs')
         .select('id, sets')
         .eq('session_id', sessionData.id)
-        .eq('client_id', clientId)
+        .eq('client_id', clientIdStr)
         .maybeSingle()
 
       if (logData) {
@@ -89,7 +91,7 @@ export default function SessionLogScreen() {
     const { data: sessionData } = await supabase
       .from('sessions')
       .select('id')
-      .eq('program_id', programId)
+      .eq('program_id', programIdStr)
       .eq('order_index', day.order)
       .maybeSingle()
 
@@ -101,8 +103,8 @@ export default function SessionLogScreen() {
       const { data: newSession, error: createError } = await supabase
         .from('sessions')
         .insert({
-          program_id: programId,
-          client_id: clientId,
+          program_id: programIdStr,
+          client_id: clientIdStr,
           day_label: day.day,
           order_index: day.order,
         })
@@ -127,7 +129,7 @@ export default function SessionLogScreen() {
     } else {
       const res = await supabase.from('session_logs').insert({
         session_id: sessionId,
-        client_id: clientId,
+        client_id: clientIdStr,
         sets,
         completed: true,
       })
@@ -140,7 +142,7 @@ export default function SessionLogScreen() {
       return
     }
 
-    await detectPRs(clientId, sets)
+    await detectPRs(clientIdStr, sets)
 
     setSaving(false)
     const title = existingLogId ? 'Séance mise à jour ✓' : 'Séance enregistrée ! 💪'
@@ -234,7 +236,7 @@ async function detectPRs(clientId: string, sets: SetLog[]) {
     const { data: existing } = await supabase
       .from('personal_records')
       .select('weight, reps')
-      .eq('client_id', clientId)
+      .eq('client_id', clientIdStr)
       .eq('exercise_name', set.exercise)
       .order('weight', { ascending: false })
       .limit(1)
