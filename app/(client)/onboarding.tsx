@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
   Alert, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform
@@ -6,6 +6,7 @@ import {
 import { useRouter } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { useClientId } from '@/hooks/useClientId'
 
 interface FormData {
   // Étape 1 — Identité
@@ -58,7 +59,15 @@ const TOTAL_STEPS = 7
 export default function ClientOnboardingScreen() {
   const router = useRouter()
   const { profile } = useAuth()
+  const { onboarding, loading: clientLoading } = useClientId(profile?.id ?? null)
   const [step, setStep] = useState(0)
+
+  // Déjà onboardé → retour à l'accueil
+  useEffect(() => {
+    if (!clientLoading && onboarding) {
+      router.replace('/(client)')
+    }
+  }, [clientLoading, onboarding])
   const [saving, setSaving] = useState(false)
   const [data, setData] = useState<FormData>({
     firstName: profile?.full_name?.split(' ')[0] ?? '',
@@ -124,6 +133,10 @@ export default function ClientOnboardingScreen() {
     }
 
     router.replace('/(client)')
+  }
+
+  if (clientLoading || onboarding) {
+    return <View style={styles.container}><ActivityIndicator color="#e11d48" /></View>
   }
 
   const isLast = step === TOTAL_STEPS - 1

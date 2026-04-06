@@ -11,7 +11,7 @@ export default function CoachAccountScreen() {
   const { profile } = useAuth()
   const { coach } = useCoach(profile?.id ?? null)
   const { clients } = useClients(coach?.id ?? null)
-  const { consentState, revoke } = useAIConsent(profile?.id)
+  const { consentState, accept, revoke } = useAIConsent(profile?.id)
   const [email, setEmail] = useState<string | null>(null)
 
   useEffect(() => {
@@ -113,22 +113,29 @@ export default function CoachAccountScreen() {
       </View>
 
       {/* Données IA */}
-      {consentState === 'accepted' && (
+      {(consentState === 'accepted' || consentState === 'declined') && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Intelligence artificielle</Text>
-          <TouchableOpacity style={styles.revokeRow} onPress={() => {
-            Alert.alert(
-              'Révoquer le consentement IA',
-              'Les fonctions de génération de programme IA seront désactivées. Tu pourras les réactiver à tout moment.',
-              [
-                { text: 'Annuler', style: 'cancel' },
-                { text: 'Révoquer', style: 'destructive', onPress: revoke },
-              ]
-            )
-          }}>
-            <Ionicons name="ban-outline" size={18} color="#ff8b1a" />
-            <Text style={styles.revokeText}>Révoquer l'accès à l'IA (OpenAI)</Text>
-          </TouchableOpacity>
+          {consentState === 'accepted' ? (
+            <TouchableOpacity style={styles.revokeRow} onPress={() => {
+              Alert.alert(
+                'Révoquer le consentement IA',
+                'Les fonctions de génération de programme IA seront désactivées. Tu pourras les réactiver à tout moment.',
+                [
+                  { text: 'Annuler', style: 'cancel' },
+                  { text: 'Révoquer', style: 'destructive', onPress: revoke },
+                ]
+              )
+            }}>
+              <Ionicons name="ban-outline" size={18} color="#ff8b1a" />
+              <Text style={styles.revokeText}>Révoquer l'accès à l'IA (OpenAI)</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.enableAIRow} onPress={accept}>
+              <Ionicons name="sparkles-outline" size={18} color="#3080ff" />
+              <Text style={styles.enableAIText}>Activer l'analyse IA (OpenAI)</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -212,4 +219,6 @@ const styles = StyleSheet.create({
 
   revokeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1e293b', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#ff8b1a30' },
   revokeText: { color: '#ff8b1a', fontSize: 14, fontWeight: '600' },
+  enableAIRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1e293b', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#3080ff30' },
+  enableAIText: { color: '#3080ff', fontSize: 14, fontWeight: '600' },
 })

@@ -17,7 +17,9 @@ export default function SessionLogScreen() {
   }>()
   const router = useRouter()
 
-  const day: ProgramDay = JSON.parse(dayJson ?? '{}')
+  // dayJson peut être un array si Expo Router cumule des navigations
+  const dayJsonStr = Array.isArray(dayJson) ? dayJson[0] : (dayJson ?? '{}')
+  const day: ProgramDay = JSON.parse(dayJsonStr)
   const items = day.items ?? []
 
   const [logs, setLogs] = useState<Record<string, { weight: string; reps: string; rpe: string }>>(
@@ -94,13 +96,13 @@ export default function SessionLogScreen() {
 
     setSaving(false)
     Alert.alert('Séance enregistrée ! 💪', 'Ton coach peut voir ta progression.', [
-      { text: 'OK', onPress: () => router.back() },
+      { text: 'OK', onPress: () => router.navigate('/(client)') },
     ])
   }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <TouchableOpacity style={styles.back} onPress={() => router.back()}>
+      <TouchableOpacity style={styles.back} onPress={() => router.navigate('/(client)')}>
         <Text style={styles.backText}>‹ Retour</Text>
       </TouchableOpacity>
 
