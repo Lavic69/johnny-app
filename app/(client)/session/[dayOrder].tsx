@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Alert, ActivityIndicator
@@ -26,6 +26,44 @@ export default function SessionLogScreen() {
     () => Object.fromEntries(items.map((e) => [e.name, { weight: '', reps: '', rpe: '' }]))
   )
   const [saving, setSaving] = useState(false)
+  const [existingLogId, setExistingLogId] = useState<string | null>(null)
+  const [loadingExisting, setLoadingExisting] = useState(true)
+
+  // Pré-remplir avec le log existant si le client a déjà loggé ce jour
+  useEffect(() => {
+    async function fetchExisting() {
+      const { data: sessionData } = await supabase
+        .from('sessions')
+        .select('id')
+        .eq('program_id', programId)
+        .eq('order_index', day.order)
+        .maybeSingle()
+
+      if (!sessionData) { setLoadingExisting(false); return }
+
+      const { data: logData } = await supabase
+        .from('session_logs')
+        .select('id, sets')
+        .eq('session_id', sessionData.id)
+        .eq('client_id', clientId)
+        .maybeSingle()
+
+      if (logData) {
+        setExistingLogId(logData.id)
+        const prefilled: Record<string, { weight: string; reps: string; rpe: string }> = {}
+        for (const set of logData.sets as SetLog[]) {
+          prefilled[set.exercise] = {
+            weight: set.weight > 0 ? String(set.weight) : '',
+            reps: set.reps > 0 ? String(set.reps) : '',
+            rpe: set.rpe > 0 ? String(set.rpe) : '',
+          }
+        }
+        setLogs((prev) => ({ ...prev, ...prefilled }))
+      }
+      setLoadingExisting(false)
+    }
+    fetchExisting()
+  }, [])
 
   function updateLog(exercise: string, field: 'weight' | 'reps' | 'rpe', value: string) {
     setLogs((prev) => ({ ...prev, [exercise]: { ...(prev[exercise] ?? {}), [field]: value } }))
@@ -79,12 +117,22 @@ export default function SessionLogScreen() {
       sessionId = newSession.id
     }
 
-    const { error: logError } = await supabase.from('session_logs').insert({
-      session_id: sessionId,
-      client_id: clientId,
-      sets,
-      completed: true,
-    })
+    let logError: any
+    if (existingLogId) {
+      const res = await supabase
+        .from('session_logs')
+        .update({ sets, logged_at: new Date().toISOString() })
+        .eq('id', existingLogId)
+      logError = res.error
+    } else {
+      const res = await supabase.from('session_logs').insert({
+        session_id: sessionId,
+        client_id: clientId,
+        sets,
+        completed: true,
+      })
+      logError = res.error
+    }
 
     if (logError) {
       Alert.alert('Erreur', logError.message)
@@ -95,9 +143,18 @@ export default function SessionLogScreen() {
     await detectPRs(clientId, sets)
 
     setSaving(false)
-    Alert.alert('Séance enregistrée ! 💪', 'Ton coach peut voir ta progression.', [
+    const title = existingLogId ? 'Séance mise à jour ✓' : 'Séance enregistrée ! 💪'
+    Alert.alert(title, 'Ton coach peut voir ta progression.', [
       { text: 'OK', onPress: () => router.navigate('/(client)') },
     ])
+  }
+
+  if (loadingExisting) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator color="#e11d48" />
+      </View>
+    )
   }
 
   return (
@@ -107,7 +164,7 @@ export default function SessionLogScreen() {
       </TouchableOpacity>
 
       <Text style={styles.title}>{day.day}</Text>
-      <Text style={styles.subtitle}>Logger ta séance</Text>
+      <Text style={styles.subtitle}>{existingLogId ? 'Modifier ta séance' : 'Logger ta séance'}</Text>
 
       {items.map((exercise) => (
         <View key={exercise.name} style={styles.exerciseCard}>
