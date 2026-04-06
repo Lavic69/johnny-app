@@ -144,7 +144,7 @@ function DayCard({ day, logged, onPress }: { day: ProgramDay; logged: boolean; o
       </View>
       {logged ? (
         <View style={styles.loggedBadge}>
-          <Ionicons name="checkmark-circle" size={16} color="#00bb7f" />
+          <Ionicons name="create-outline" size={15} color="#ff8b1a" />
           <Text style={styles.loggedBadgeText}>Modifier</Text>
         </View>
       ) : (
@@ -214,8 +214,8 @@ const styles = StyleSheet.create({
   exerciseCount: { color: '#94a3b8', fontSize: 13, marginTop: 4 },
   loggedBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: '#00bb7f20', borderRadius: 20,
+    backgroundColor: '#ff8b1a20', borderRadius: 20,
     paddingHorizontal: 10, paddingVertical: 5,
   },
-  loggedBadgeText: { color: '#00bb7f', fontSize: 12, fontWeight: '700' },
+  loggedBadgeText: { color: '#ff8b1a', fontSize: 12, fontWeight: '700' },
 })
