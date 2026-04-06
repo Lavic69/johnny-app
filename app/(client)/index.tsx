@@ -1,10 +1,11 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '@/hooks/useAuth'
 import { useClientId } from '@/hooks/useClientId'
 import { useActiveProgram } from '@/hooks/useActiveProgram'
+import { supabase } from '@/lib/supabase'
 import type { ProgramDay } from '@/lib/openai'
 
 export default function ClientHome() {
@@ -12,9 +13,26 @@ export default function ClientHome() {
   const { profile } = useAuth()
   const { clientId, onboarding, loading: clientLoading, refetch } = useClientId(profile?.id ?? null)
   const { program, loading: programLoading } = useActiveProgram(clientId)
+  const [loggedDays, setLoggedDays] = useState<Set<number>>(new Set())
 
-  // Refetch à chaque fois que l'écran revient au premier plan (ex: retour de l'onboarding)
-  useFocusEffect(useCallback(() => { refetch() }, [refetch]))
+  const fetchLoggedDays = useCallback(async () => {
+    if (!clientId || !program) return
+    const { data } = await supabase
+      .from('sessions')
+      .select('order_index, session_logs(id)')
+      .eq('program_id', program.id)
+    if (!data) return
+    const logged = new Set<number>()
+    for (const s of data) {
+      if ((s.session_logs as any[]).length > 0) logged.add(s.order_index)
+    }
+    setLoggedDays(logged)
+  }, [clientId, program?.id])
+
+  useFocusEffect(useCallback(() => {
+    refetch()
+    fetchLoggedDays()
+  }, [refetch, fetchLoggedDays]))
 
   if (clientLoading || programLoading) {
     return <View style={styles.center}><ActivityIndicator color="#e11d48" size="large" /></View>
@@ -92,6 +110,7 @@ export default function ClientHome() {
           <DayCard
             key={day.order}
             day={day}
+            logged={loggedDays.has(day.order)}
             onPress={() =>
               router.push({
                 pathname: '/(client)/session/[dayOrder]',
@@ -110,15 +129,27 @@ export default function ClientHome() {
   )
 }
 
-function DayCard({ day, onPress }: { day: ProgramDay; onPress: () => void }) {
+function DayCard({ day, logged, onPress }: { day: ProgramDay; logged: boolean; onPress: () => void }) {
   const items = day.items ?? []
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.75}>
+    <TouchableOpacity
+      style={[styles.card, logged && styles.cardLogged]}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
+      <View style={[styles.cardIndicator, logged && styles.cardIndicatorLogged]} />
       <View style={styles.cardLeft}>
-        <Text style={styles.dayLabel}>{day.day}</Text>
+        <Text style={[styles.dayLabel, logged && styles.dayLabelLogged]}>{day.day}</Text>
         <Text style={styles.exerciseCount}>{items.length} exercice{items.length > 1 ? 's' : ''}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={20} color="#475569" />
+      {logged ? (
+        <View style={styles.loggedBadge}>
+          <Ionicons name="checkmark-circle" size={16} color="#00bb7f" />
+          <Text style={styles.loggedBadgeText}>Modifier</Text>
+        </View>
+      ) : (
+        <Ionicons name="chevron-forward" size={20} color="#475569" />
+      )}
     </TouchableOpacity>
   )
 }
@@ -165,8 +196,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#1e293b', borderRadius: 16,
     padding: 18, marginBottom: 10,
     borderWidth: 1, borderColor: '#334155',
+    overflow: 'hidden',
   },
-  cardLeft: { flex: 1 },
+  cardLogged: {
+    backgroundColor: '#00bb7f12',
+    borderColor: '#00bb7f40',
+  },
+  cardIndicator: {
+    width: 3, height: '100%', borderRadius: 2,
+    backgroundColor: '#334155', marginRight: 14,
+    position: 'absolute', left: 0, top: 0, bottom: 0,
+  },
+  cardIndicatorLogged: { backgroundColor: '#00bb7f' },
+  cardLeft: { flex: 1, marginLeft: 8 },
   dayLabel: { color: '#f8fafc', fontWeight: '600', fontSize: 16 },
+  dayLabelLogged: { color: '#00bb7f' },
   exerciseCount: { color: '#94a3b8', fontSize: 13, marginTop: 4 },
+  loggedBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: '#00bb7f20', borderRadius: 20,
+    paddingHorizontal: 10, paddingVertical: 5,
+  },
+  loggedBadgeText: { color: '#00bb7f', fontSize: 12, fontWeight: '700' },
 })
