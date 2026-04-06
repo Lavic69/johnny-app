@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { Tabs } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -8,14 +9,35 @@ import { supabase } from '@/lib/supabase'
 export default function CoachLayout() {
   const { profile } = useAuth()
   const { coach, loading } = useCoach(profile?.id ?? null)
+  const [forcedBlocked, setForcedBlocked] = useState(false)
+
+  // Realtime — éjecte le coach immédiatement si désactivé en cours de session
+  useEffect(() => {
+    if (!coach?.id) return
+
+    const channel = supabase
+      .channel(`coach-self-status-${coach.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'coaches', filter: `id=eq.${coach.id}` },
+        (payload) => {
+          if ((payload.new as any).status !== 'active') {
+            setForcedBlocked(true)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [coach?.id])
 
   // Attendre que le statut soit chargé avant d'afficher quoi que ce soit
   if (loading) {
     return <View style={styles.blocked}><ActivityIndicator color="#e11d48" /></View>
   }
 
-  // Pas de coach trouvé ou statut !== active → écran bloquant
-  if (!coach || coach.status !== 'active') {
+  // Pas de coach trouvé, statut !== active, ou désactivé en temps réel → écran bloquant
+  if (forcedBlocked || !coach || coach.status !== 'active') {
     return (
       <View style={styles.blocked}>
         <View style={styles.iconWrap}>
