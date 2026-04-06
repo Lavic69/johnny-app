@@ -55,7 +55,7 @@ export default function ClientDetailScreen() {
                       Alert.alert('Erreur', "La suppression a échoué. Réessaie ou contacte le support.")
                       return
                     }
-                    router.back()
+                    router.navigate('/(coach)/clients')
                   },
                 },
               ]
@@ -78,7 +78,7 @@ export default function ClientDetailScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.navigate('/(coach)/clients')}>
           <Text style={styles.back}>‹ Retour</Text>
         </TouchableOpacity>
         <View style={styles.avatarRow}>
