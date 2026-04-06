@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '@/lib/supabase'
 import { useClientPrograms } from '@/hooks/usePrograms'
 import { useCheckins } from '@/hooks/useCheckins'
@@ -109,6 +110,7 @@ export default function ClientDetailScreen() {
             </TouchableOpacity>
           )}
           <TouchableOpacity style={styles.deleteClientBtn} onPress={handleDeleteClient}>
+            <Ionicons name="trash-outline" size={16} color="#e11d48" />
             <Text style={styles.deleteClientText}>Supprimer ce client</Text>
           </TouchableOpacity>
         </View>
@@ -414,6 +416,10 @@ const styles = StyleSheet.create({
   headerActions: { marginTop: 16, gap: 8 },
   generateBtn: { backgroundColor: '#3080ff', borderRadius: 12, padding: 12, alignItems: 'center' },
   generateBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  deleteClientBtn: { alignItems: 'center', padding: 10 },
-  deleteClientText: { color: '#475569', fontSize: 13, fontWeight: '500' },
+  deleteClientBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, borderRadius: 12, padding: 12, marginTop: 4,
+    borderWidth: 1, borderColor: '#e11d4840', backgroundColor: '#e11d4810',
+  },
+  deleteClientText: { color: '#e11d48', fontSize: 14, fontWeight: '600' },
 })
