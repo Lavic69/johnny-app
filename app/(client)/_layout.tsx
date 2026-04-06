@@ -22,12 +22,9 @@ export default function ClientLayout() {
       .single()
       .then(({ data }) => {
         const coach = data?.coach as { id: string; status: string } | null
-        if (coach?.status === 'active') {
-          setCoachId(coach.id)
-          setCoachStatus('active')
-        } else {
-          setCoachStatus('blocked')
-        }
+        if (!coach) { setCoachStatus('blocked'); return }
+        setCoachId(coach.id) // toujours stocker l'id pour le Realtime
+        setCoachStatus(coach.status === 'active' ? 'active' : 'blocked')
       })
   }, [profile?.id])
 
@@ -41,9 +38,8 @@ export default function ClientLayout() {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'coaches', filter: `id=eq.${coachId}` },
         (payload) => {
-          if ((payload.new as any).status !== 'active') {
-            setCoachStatus('blocked')
-          }
+          const newStatus = (payload.new as any).status
+          setCoachStatus(newStatus === 'active' ? 'active' : 'blocked')
         }
       )
       .subscribe()
