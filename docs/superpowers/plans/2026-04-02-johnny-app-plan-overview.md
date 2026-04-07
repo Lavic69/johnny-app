@@ -12,15 +12,27 @@
 
 ## Phases
 
-| Phase | Contenu | Plan détaillé |
-|-------|---------|---------------|
-| 1 | Foundation — Setup, DB schema, Auth, Navigation | [phase-1-foundation.md](2026-04-02-phase-1-foundation.md) |
-| 2 | Coach — Gestion clients + invitations | [phase-2-coach-clients.md](2026-04-02-phase-2-coach-clients.md) |
-| 3 | Coach — Génération IA de programmes | [phase-3-ai-programs.md](2026-04-02-phase-3-ai-programs.md) |
-| 4 | Client — Programme + Logger séances + PRs | [phase-4-client-training.md](2026-04-02-phase-4-client-training.md) |
-| 5 | Client — Tracker nutritionnel (barcode + recherche) | [phase-5-nutrition.md](2026-04-02-phase-5-nutrition.md) |
-| 6 | Check-ins hebdo + Notifications push | [phase-6-checkins-notifs.md](2026-04-02-phase-6-checkins-notifs.md) |
-| 7 | Admin — Activation comptes coaches | [phase-7-admin.md](2026-04-02-phase-7-admin.md) |
+| Phase | Contenu | Statut | Plan détaillé |
+|-------|---------|--------|---------------|
+| 1 | Foundation — Setup, DB schema, Auth, Navigation | ✅ | [phase-1-foundation.md](2026-04-02-phase-1-foundation.md) |
+| 2 | Coach — Gestion clients + invitations | ✅ | [phase-2-coach-clients.md](2026-04-02-phase-2-coach-clients.md) |
+| 3 | Coach — Génération IA de programmes | ✅ | [phase-3-ai-programs.md](2026-04-02-phase-3-ai-programs.md) |
+| 4 | Client — Programme + Logger séances + PRs | ✅ | [phase-4-client-training.md](2026-04-02-phase-4-client-training.md) |
+| 5 | Client — Tracker nutritionnel (barcode + recherche) | ✅ | [phase-5-nutrition.md](2026-04-02-phase-5-nutrition.md) |
+| 6 | Check-ins hebdo + Notifications push | ✅ | [phase-6-checkins-notifs.md](2026-04-02-phase-6-checkins-notifs.md) |
+| 7 | Admin — Activation comptes coaches | ✅ | [phase-7-admin.md](2026-04-02-phase-7-admin.md) |
+| 8 | Sécurité (audit Trail of Bits × 2) + Compliance store | ✅ | [SECURITY_AUDIT.md](../../SECURITY_AUDIT.md) |
+
+**Statut global : développement complet. En attente de soumission store.**
+
+### Checklist soumission store
+
+- [ ] Test end-to-end sur device physique (iOS + Android)
+- [ ] Déployer `docs/privacy-policy.html` → `johnny-site.vercel.app/privacy`
+- [ ] Renseigner URL Privacy Policy dans App Store Connect + Play Console
+- [ ] Renseigner `appleId` / `ascAppId` / `appleTeamId` dans `eas.json`
+- [ ] `eas build --platform all --profile production`
+- [ ] `eas submit --platform all`
 
 ---
 

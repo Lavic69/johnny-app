@@ -1,5 +1,5 @@
 # Audit de Sécurité — Johnny App
-**Date :** 2026-04-04  
+**Date initiale :** 2026-04-04 | **Dernière mise à jour :** 2026-04-07  
 **Branche :** `securite-app`  
 **Skills utilisés :** Trail of Bits — `audit-context-building` · `insecure-defaults` · `sharp-edges` · `supply-chain-risk-auditor`
 
@@ -129,6 +129,21 @@ values (new.id, 'client', coalesce(new.raw_user_meta_data->>'full_name', new.ema
 
 ---
 
+### RÉSOLU — `EXPO_PUBLIC_OPENAI_API_KEY` dans `.env.local` (`MEDIUM`)
+
+**Localisation :** `.env.local:3`
+
+**Pattern :**
+```
+EXPO_PUBLIC_OPENAI_API_KEY=sk-proj-...  ← préfixe EXPO_PUBLIC_ = auto-bundlé si référencé
+```
+
+**Impact :** La clé n'était pas utilisée côté client (`lib/env.ts` ne l'expose pas), mais sa présence avec ce préfixe était une bombe à retardement — toute future référence accidentelle dans le code client l'aurait bundlée dans l'app. De plus, la clé réelle était stockée dans le fichier.
+
+**Fix :** Ligne supprimée de `.env.local`. La clé OpenAI reste uniquement comme secret Supabase côté serveur (Edge Function `openai-proxy`).
+
+---
+
 ## 3. Findings `sharp-edges`
 
 ### RÉSOLU — `Math.random()` pour génération de codes d'invitation (`MEDIUM`)
@@ -162,9 +177,69 @@ function generateCode(): string {
 
 ---
 
+### RÉSOLU — `clients` INSERT policy ne valide pas le `coach_id` (`MEDIUM`)
+
+**Localisation :** `supabase/migrations/003_security_fixes.sql` (policy remplacée dans `005`)
+
+**Pattern :**
+```sql
+-- AVANT — insuffisant
+CREATE POLICY "New client can insert own record"
+  ON public.clients FOR INSERT
+  WITH CHECK (profile_id = auth.uid());
+  -- ↑ n'importe quel coach_id était accepté
+```
+
+**Impact :** Après la création de compte via le redeem flow, un utilisateur techniquement averti pouvait appeler `clients.insert({ profile_id: userId, coach_id: N_IMPORTE_QUEL_COACH_ID })` et se rattacher à n'importe quel coach. Ce coach verrait le client dans son dashboard sans l'avoir invité.
+
+**Fix :** Policy remplacée pour valider que le `coach_id` correspond à un invite_token valide (non expiré, non utilisé) portant l'email de l'utilisateur courant.
+
+```sql
+-- APRÈS — secure
+CREATE FUNCTION public.get_current_user_email()
+RETURNS text LANGUAGE sql SECURITY DEFINER STABLE AS
+$$ SELECT email FROM auth.users WHERE id = auth.uid() $$;
+
+CREATE POLICY "New client can insert own record"
+  ON public.clients FOR INSERT
+  WITH CHECK (
+    profile_id = auth.uid()
+    AND EXISTS (
+      SELECT 1 FROM public.invite_tokens it
+      WHERE it.coach_id = coach_id
+        AND it.used = false
+        AND it.expires_at > now()
+        AND (it.email IS NULL OR it.email = public.get_current_user_email())
+    )
+  );
+```
+
+**Migration :** `005_security_sharp_edges`
+
+---
+
+### RÉSOLU — Push token stocké dans `avatar_url` (`LOW`)
+
+**Localisation :** `lib/notifications.ts:38` (avant fix)
+
+**Pattern :**
+```ts
+// AVANT — confusion de type
+await supabase.from('profiles').update({ avatar_url: token }).eq('id', userId)
+```
+
+**Impact :** Toute image de profil aurait été écrasée par le push token (une chaîne `ExponentPushToken[...]`). Code affichant `avatar_url` comme image URL → comportement cassé silencieusement.
+
+**Fix :** Colonne dédiée `push_token text` ajoutée sur `profiles` (migration `005`). `lib/notifications.ts` mis à jour pour utiliser `push_token`.
+
+**Migration :** `005_security_sharp_edges`
+
+---
+
 ## 4. Finding `supply-chain-risk-auditor`
 
-### RÉSOLU — Package `openai` mort dans les dépendances (`MEDIUM`)
+### RÉSOLU — Package `openai` mort dans les dépendances (`MEDIUM`)  
+*(Audit 2026-04-04)*
 
 **Localisation :** `package.json` — `"openai": "6.33.0"`
 
@@ -175,6 +250,26 @@ function generateCode(): string {
 **Fix :** Package retiré de `package.json`.
 
 **Commit :** `69d330e`
+
+---
+
+### INFO — 5 vulnérabilités LOW dans les devDependencies (`jest-expo` chain)
+
+**Scope :** Environnement de test uniquement — aucun impact production.
+
+| Package | Severity | Via |
+|---------|----------|-----|
+| `@tootallnate/once` | LOW | `http-proxy-agent` |
+| `http-proxy-agent` | LOW | `jsdom` |
+| `jsdom` | LOW | `jest-environment-jsdom` |
+| `jest-environment-jsdom` | LOW | `jest-expo` |
+| `jest-expo` | LOW | (direct devDep) |
+
+**Action :** Aucune — non bundlé, non exploitable en production. À surveiller lors des montées de version `jest-expo`.
+
+### INFO — Supply chain globale : propre
+
+Toutes les dépendances directes de production sont de grands acteurs maintenus par des organisations (Expo, Meta, Supabase, Microsoft, Software Mansion). Aucune dépendance single-maintainer anonyme, aucun package déprécié ou archivé.
 
 ---
 
@@ -234,7 +329,7 @@ Points d'intégration :
 
 | Scan | Résultat |
 |------|----------|
-| `grep EXPO_PUBLIC_OPENAI` dans le codebase | ✅ Exit 1 — aucun match |
+| `grep EXPO_PUBLIC_OPENAI` dans le codebase | ✅ Exit 1 — aucun match (clé retirée de `.env.local`) |
 | `grep dangerouslyAllowBrowser` dans le codebase | ✅ Exit 1 — aucun match |
 | `grep "from 'openai'"` dans le codebase | ✅ Exit 1 — aucun match |
 | HTTP (non-HTTPS) dans les appels réseau | ✅ Aucun trouvé |
@@ -251,27 +346,47 @@ Points d'intégration :
 |-----------|-------------|
 | `001_initial_schema` | Schéma initial + RLS activé + policies de base |
 | `002_admin_policies` | Policies admin (via fonction `is_admin()`) |
-| `003_security_fixes` | Fix trigger + policies manquantes (ce sprint) |
+| `003_security_fixes` | Fix trigger + policies manquantes (sprint 1) |
 | `fix_trigger_role_and_invite_update` | Fix final trigger + UPDATE invite_tokens |
 | `004_ai_consent` | Colonnes `ai_consent` (boolean) + `ai_consent_at` (timestamptz) sur `profiles` |
+| `fix_rls_recursion_coach_client` | Fonction `get_own_coach_id()` (security definer) — casse la récursion RLS coaches↔clients |
+| `005_security_sharp_edges` | Fix INSERT clients (validation coach_id via invite_tokens) + colonne `push_token` |
 
 ### Edge Functions déployées
 | Fonction | Version | JWT requis |
 |----------|---------|-----------|
-| `openai-proxy` | v1 | ✅ Oui |
+| `openai-proxy` | v3 | ✅ Oui (anon key pour verify, service_role pour role check) |
 | `delete-account` | v1 | ✅ Oui (service_role pour suppression) |
+| `delete-client` | v1 | ✅ Oui (vérifie ownership coach → client avant suppression) |
 
 ---
 
 ## 8. Résumé exécutif
 
-**Score avant audit :** 4 findings critiques/hauts ouverts, app partiellement cassée en production (RLS sans policies), clé API exposée dans le bundle.
+### Sprint 1 (2026-04-04)
+**Score avant :** 4 findings critiques/hauts ouverts, clé API dans le bundle, RLS incomplet.  
+**Score après :** 0 finding ouvert.
 
-**Score après audit :** 0 finding ouvert. Tous les vecteurs d'attaque identifiés ont été corrigés et vérifiés en DB et en code.
+### Sprint 2 — Audit complet Trail of Bits (2026-04-07)
 
-**Compliance Apple — mise à jour :**
+**Périmètre :** Ensemble du codebase (app mobile + Edge Functions + migrations DB).  
+**Skills utilisés :** `insecure-defaults` · `sharp-edges` · `supply-chain-risk-auditor`
+
+**Findings résolus :**
+
+| Sévérité | Finding | Fix |
+|----------|---------|-----|
+| MEDIUM | `EXPO_PUBLIC_OPENAI_API_KEY` dans `.env.local` | Supprimé |
+| MEDIUM | `clients` INSERT accepte n'importe quel `coach_id` | Migration `005` + helper `get_current_user_email()` |
+| LOW | Push token stocké dans `avatar_url` (confusion de type) | Migration `005` + colonne `push_token` dédiée |
+| INFO | 5 LOW CVEs dans devDeps `jest-expo` | Aucune action requise (non-production) |
+| INFO | Supply chain globale | Propre — toutes dépendances prod issues de grandes organisations |
+
+**Compliance Apple — état final :**
 - ✅ Suppression de compte in-app (Apple obligatoire) — Edge Function + double confirmation
-- ✅ Consentement IA OpenAI (Guideline 5.1.2(i), nov. 2025) — modale + révocation + persistance DB
+- ✅ Consentement IA OpenAI (Guideline 5.1.2(i)) — modale + révocation + persistance DB
+- ✅ Privacy Manifest (`NSPrivacyAccessedAPITypes`) — `app.json`
+- ✅ Descriptions permissions camera/photos — `app.json`
 - 🔲 Privacy Policy URL — à renseigner dans App Store Connect avant soumission
 
 **L'app est prête techniquement pour une soumission store.** Il reste un seul point de process : renseigner l'URL de la politique de confidentialité dans App Store Connect / Play Console.

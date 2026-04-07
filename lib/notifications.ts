@@ -36,9 +36,8 @@ export async function registerPushToken(userId: string): Promise<void> {
 
   const token = (await Notifications.getExpoPushTokenAsync()).data
 
-  // Store token in avatar_url temporarily — to be replaced by a push_token column in V2
   await supabase
     .from('profiles')
-    .update({ avatar_url: token })
+    .update({ push_token: token })
     .eq('id', userId)
 }

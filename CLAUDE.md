@@ -95,21 +95,126 @@ Full tokens documented in [design/system.md](design/system.md).
 
 ---
 
+## Statut du projet
+
+> Dernière mise à jour : 2026-04-07
+
+### ✅ Développement — COMPLET (phases 1–7)
+
+| Phase | Contenu | Statut |
+|-------|---------|--------|
+| 1 | Foundation — Setup, DB schema, Auth, Navigation | ✅ |
+| 2 | Coach — Gestion clients + invitations | ✅ |
+| 3 | Coach — Génération IA de programmes (Edge Function proxy) | ✅ |
+| 4 | Client — Programme + Logger séances + PRs | ✅ |
+| 5 | Client — Tracker nutritionnel (barcode + recherche + analyse IA) | ✅ |
+| 6 | Check-ins hebdo + Notifications push | ✅ |
+| 7 | Admin — Activation comptes coaches (Realtime ejection) | ✅ |
+
+### ✅ Sécurité — COMPLET (2 sprints d'audit Trail of Bits)
+
+Voir [SECURITY_AUDIT.md](SECURITY_AUDIT.md) pour le détail complet.
+
+| Item | Statut |
+|------|--------|
+| Clé OpenAI hors bundle (Edge Function proxy) | ✅ |
+| Privilege escalation signup (trigger role hardcodé) | ✅ |
+| RLS complet sur toutes les tables (28 policies) | ✅ |
+| Codes d'invitation CSPRNG (`crypto.getRandomValues`) | ✅ |
+| Blocage coach désactivé en temps réel (Realtime) | ✅ |
+| Récursion RLS infinie cassée (security definer function) | ✅ |
+| Suppression de compte in-app (Edge Function `delete-account`) | ✅ |
+| Suppression de client par le coach (Edge Function `delete-client`) | ✅ |
+| Consentement IA OpenAI (Apple Guideline 5.1.2(i)) | ✅ |
+| Privacy Manifest iOS (`NSPrivacyAccessedAPITypes`) | ✅ |
+| `clients` INSERT validé contre `invite_tokens` (coach_id safe) | ✅ |
+| Push token dans colonne dédiée (plus dans `avatar_url`) | ✅ |
+| `EXPO_PUBLIC_OPENAI_API_KEY` retiré de `.env.local` | ✅ |
+
+### 🔲 Avant soumission store — RESTANT
+
+| # | Action | Responsable |
+|---|--------|-------------|
+| 1 | **Test end-to-end sur device physique** (iOS + Android) — vérifier tous les flux | Dev |
+| 2 | **Déployer `privacy-policy.html`** sur Vercel (`johnny-site.vercel.app/privacy`) | Dev |
+| 3 | **Renseigner l'URL Privacy Policy** dans App Store Connect + Play Console | Dev |
+| 4 | **Renseigner `appleId`, `ascAppId`, `appleTeamId`** dans `eas.json` | Dev |
+| 5 | **`eas build --platform all`** — build production iOS + Android | Dev |
+| 6 | **`eas submit`** — soumettre aux stores | Dev |
+
+---
+
 ## File Structure
 
-> _À remplir une fois le projet scaffoldé._
+```
+app/
+  _layout.tsx                   # Root layout + auth gate (rôle-based routing)
+  (auth)/login.tsx              # Connexion email/password
+  (auth)/redeem.tsx             # Première connexion client (code d'invitation)
+  (auth)/onboarding.tsx         # Formulaire onboarding client (objectifs, niveau…)
+  (coach)/_layout.tsx           # Tab bar coach + guard statut actif + Realtime
+  (coach)/index.tsx             # Dashboard coach
+  (coach)/clients/index.tsx     # Liste clients
+  (coach)/clients/new.tsx       # Créer client + générer code d'invitation
+  (coach)/clients/[id]/index.tsx # Fiche client (séances, nutrition, check-ins)
+  (coach)/programs/generate.tsx  # Génération IA + review + approbation
+  (coach)/account.tsx           # Compte coach + suppression + consentement IA
+  (client)/_layout.tsx          # Tab bar client + guard coach actif + Realtime
+  (client)/index.tsx            # Programme du jour (DayCards avec état logged)
+  (client)/session/[dayOrder].tsx # Logger une séance (sets, poids, RPE)
+  (client)/nutrition/index.tsx  # Journal alimentaire
+  (client)/nutrition/add.tsx    # Ajouter aliment (barcode, recherche, IA)
+  (client)/checkin.tsx          # Check-in hebdomadaire
+  (client)/account.tsx          # Compte client + suppression + consentement IA
+  (admin)/_layout.tsx           # Layout admin
+  (admin)/index.tsx             # Panneau activation coaches
+
+lib/
+  supabase.ts                   # Client Supabase (AsyncStorage session)
+  openai.ts                     # Proxy Edge Function (jamais de clé dans le bundle)
+  openfoodfacts.ts              # Wrapper Open Food Facts API
+  notifications.ts              # Push token (colonne push_token sur profiles)
+  env.ts                        # ENV.supabaseUrl + ENV.supabaseAnonKey uniquement
+
+hooks/
+  useAuth.ts                    # Session + profile + role
+  useCoach.ts                   # Chargement enregistrement coach par profile_id
+
+supabase/
+  functions/
+    openai-proxy/index.ts       # Proxy OpenAI (auth JWT + role check + OPENAI_API_KEY secret)
+    delete-account/index.ts     # Suppression compte (auth JWT → admin.deleteUser)
+    delete-client/index.ts      # Suppression client par coach (ownership check → admin.deleteUser)
+  migrations/
+    001_initial_schema.sql      # Schéma + RLS activé + policies de base + trigger
+    002_admin_policies.sql      # Policies admin
+    003_security_fixes.sql      # Fix trigger role + policies manquantes (8 tables)
+    005_security_sharp_edges.sql # Fix clients INSERT (coach_id via invite_tokens) + push_token column
+
+docs/
+  privacy-policy.html           # Page politique de confidentialité (à déployer sur Vercel)
+  superpowers/plans/            # Plans d'implémentation par phase
+```
 
 ---
 
 ## Key Conventions
 
-> _À remplir au fur et à mesure._
+- **Rôles :** `coach`, `client`, `admin` — hardcodé à `client` à l'inscription, promu manuellement
+- **Auth guard :** chaque `_layout.tsx` de zone vérifie le statut (actif/bloqué) avant de rendre les tabs
+- **OpenAI :** toujours via `lib/openai.ts` → Edge Function `openai-proxy` — jamais de clé client-side
+- **Realtime :** subscriptions Supabase dans les layouts pour éjection immédiate si coach désactivé
+- **Suppression :** toujours via Edge Function (service_role) — jamais depuis le client directement
+- **Codes invitation :** 6 chars, alphabet 32 (pas O/0/I/1), `crypto.getRandomValues()`, expiry 7j
+- **Migrations :** numérotées `001_`, `002_`… — ne jamais modifier une migration existante appliquée
 
 ---
 
 ## External References
 
-> _Liens Figma, Notion, ou autres outils à ajouter._
+- **Site de référence design :** [johnny-site.vercel.app](https://johnny-site.vercel.app)
+- **Supabase project :** `wawkkwdlcskyzhdqviha` (URL dans `.env.local`)
+- **Audit sécurité complet :** [SECURITY_AUDIT.md](SECURITY_AUDIT.md)
 
 ---
 
@@ -134,3 +239,8 @@ Full tokens documented in [design/system.md](design/system.md).
 | 2026-04-02 | Accès client via invitation coach uniquement | Contrôle de la relation coach/client |
 | 2026-04-02 | Pas de paiement in-app en V1 | B2B direct avec connaissances, paiement géré manuellement par Johnny |
 | 2026-04-02 | Compte coach = actif/en attente | Johnny active manuellement après paiement externe |
+| 2026-04-04 | OpenAI via Edge Function proxy uniquement | Clé jamais dans le bundle — audit sécurité |
+| 2026-04-04 | Suppression de compte in-app obligatoire | Apple App Store Guideline 5.1.1 |
+| 2026-04-04 | Consentement IA explicite avant génération | Apple Guideline 5.1.2(i) nov. 2025 |
+| 2026-04-07 | Audit sécurité Trail of Bits sprint 2 complet | 0 finding ouvert, app prête pour soumission |
+| 2026-04-07 | Privacy Policy page créée (`docs/privacy-policy.html`) | Requis App Store Connect + Play Console |
